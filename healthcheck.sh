@@ -1,0 +1,1 @@
+find /tmp/fieldwork-adapter-healthy -mmin -1 | egrep '.*'

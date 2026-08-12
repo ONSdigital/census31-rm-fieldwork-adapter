@@ -1,0 +1,11 @@
+.idea/*
+*.iml
+target/*
+.java-version
+.DS_Store
+# Megalinter reports
+megalinter-reports/
+# Podman secrets
+podman-build-secret*
+*.ipr
+*.iws
