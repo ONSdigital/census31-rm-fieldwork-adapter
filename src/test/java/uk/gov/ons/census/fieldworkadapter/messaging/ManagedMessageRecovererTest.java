@@ -56,7 +56,7 @@ class ManagedMessageRecovererTest {
     verify(exceptionManagerClient)
         .reportException(
             eq(TEST_MESSAGE_HASH),
-            eq("Case Processor"),
+            eq("Fieldwork Adapter"),
             eq("TEST SUBSCRIPTION"),
             any(Throwable.class),
             anyString());
@@ -81,7 +81,7 @@ class ManagedMessageRecovererTest {
     verify(exceptionManagerClient)
         .reportException(
             eq(TEST_MESSAGE_HASH),
-            eq("Case Processor"),
+            eq("Fieldwork Adapter"),
             eq("TEST SUBSCRIPTION"),
             any(RuntimeException.class),
             contains(
@@ -106,7 +106,7 @@ class ManagedMessageRecovererTest {
     verify(exceptionManagerClient)
         .reportException(
             eq(TEST_MESSAGE_HASH),
-            eq("Case Processor"),
+            eq("Fieldwork Adapter"),
             eq("TEST SUBSCRIPTION"),
             any(RuntimeException.class),
             contains(
@@ -121,7 +121,7 @@ class ManagedMessageRecovererTest {
     assertThat(skippedMessage.getMessageHash()).isEqualTo(TEST_MESSAGE_HASH);
     assertThat(skippedMessage.getMessagePayload()).isEqualTo("TEST PAYLOAD".getBytes());
     assertThat(skippedMessage.getSubscription()).isEqualTo("TEST SUBSCRIPTION");
-    assertThat(skippedMessage.getService()).isEqualTo("Case Processor");
+    assertThat(skippedMessage.getService()).isEqualTo("Fieldwork Adapter");
   }
 
   @Test
@@ -143,7 +143,7 @@ class ManagedMessageRecovererTest {
     verify(exceptionManagerClient)
         .reportException(
             eq(TEST_MESSAGE_HASH),
-            eq("Case Processor"),
+            eq("Fieldwork Adapter"),
             eq("TEST SUBSCRIPTION"),
             any(RuntimeException.class),
             contains(
@@ -169,7 +169,7 @@ class ManagedMessageRecovererTest {
     verify(exceptionManagerClient)
         .reportException(
             eq(TEST_MESSAGE_HASH),
-            eq("Case Processor"),
+            eq("Fieldwork Adapter"),
             eq("TEST SUBSCRIPTION"),
             any(RuntimeException.class),
             contains(

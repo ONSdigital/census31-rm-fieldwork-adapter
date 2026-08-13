@@ -49,9 +49,9 @@ public class ActionFieldReceiver {
 
     switch (header.getFieldActionInstruction()) {
       case null -> {
-        if (log.isDebugEnabled()) {
-          log.debug(
-              "Swallowing CASE_UPDATE with null fieldActionInstruction, caseId={}",
+        if (log.isInfoEnabled()) {
+          log.info(
+              "Ignoring CASE_UPDATE with null fieldActionInstruction, caseId={}",
               caseUpdate.getCaseId());
         }
       }
@@ -68,8 +68,8 @@ public class ActionFieldReceiver {
 
   private void handleCancelInstruction(CaseUpdateDTO caseUpdate) {
     if (isNisraCase(caseUpdate)) {
-      if (log.isDebugEnabled()) {
-        log.debug(
+      if (log.isInfoEnabled()) {
+        log.info(
             "Skipping NISRA CASE_UPDATE for CANCEL instruction, caseId={}", caseUpdate.getCaseId());
       }
       return;
@@ -89,8 +89,8 @@ public class ActionFieldReceiver {
   private void handleForwardableInstruction(
       CaseUpdateDTO caseUpdate, FieldActionInstruction fieldActionInstruction) {
     if (isNisraCase(caseUpdate)) {
-      if (log.isDebugEnabled()) {
-        log.debug(
+      if (log.isInfoEnabled()) {
+        log.info(
             "Skipping NISRA CASE_UPDATE for {} instruction, caseId={}",
             fieldActionInstruction,
             caseUpdate.getCaseId());

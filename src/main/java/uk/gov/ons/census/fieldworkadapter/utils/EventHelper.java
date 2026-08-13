@@ -11,7 +11,7 @@ import uk.gov.ons.census.fieldworkadapter.model.dto.PayloadDTO;
 
 public class EventHelper {
 
-  private static final String EVENT_SOURCE = "CASE_PROCESSOR";
+  private static final String EVENT_SOURCE = "FIELD_ADAPTER";
   private static final String EVENT_CHANNEL = "RM";
 
   public static EventHeaderDTO createEventDTO(

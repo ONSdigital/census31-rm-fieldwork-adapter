@@ -21,7 +21,7 @@ import uk.gov.ons.census.fieldworkadapter.utils.HashHelper;
 @Component
 public class ManagedMessageRecoverer implements RecoveryCallback<Object> {
   private static final Logger log = LoggerFactory.getLogger(ManagedMessageRecoverer.class);
-  private static final String SERVICE_NAME = "Case Processor";
+  private static final String SERVICE_NAME = "Fieldwork Adapter";
 
   @Value("${messagelogging.logstacktraces}")
   private boolean logStackTraces;

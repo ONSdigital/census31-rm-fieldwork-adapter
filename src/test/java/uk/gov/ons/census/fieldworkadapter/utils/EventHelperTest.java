@@ -22,7 +22,7 @@ public class EventHelperTest {
     assertThat(eventHeader.getOriginatingUser()).isEqualTo(TEST_ORIGINATING_USER);
     assertThat(eventHeader.getTopic()).isEqualTo("TOPIC");
     assertThat(eventHeader.getChannel()).isEqualTo("RM");
-    assertThat(eventHeader.getSource()).isEqualTo("CASE_PROCESSOR");
+    assertThat(eventHeader.getSource()).isEqualTo("FIELD_ADAPTER");
     assertThat(eventHeader.getDateTime()).isInstanceOf(OffsetDateTime.class);
     assertThat(eventHeader.getMessageId()).isInstanceOf(UUID.class);
   }
@@ -49,7 +49,7 @@ public class EventHelperTest {
         EventHelper.getDummyEvent(TEST_CORRELATION_ID, TEST_ORIGINATING_USER).getHeader();
 
     assertThat(eventHeader.getChannel()).isEqualTo("RM");
-    assertThat(eventHeader.getSource()).isEqualTo("CASE_PROCESSOR");
+    assertThat(eventHeader.getSource()).isEqualTo("FIELD_ADAPTER");
     assertThat(eventHeader.getMessageId()).isInstanceOf(UUID.class);
     assertThat(eventHeader.getCorrelationId()).isEqualTo(TEST_CORRELATION_ID);
     assertThat(eventHeader.getOriginatingUser()).isEqualTo(TEST_ORIGINATING_USER);
