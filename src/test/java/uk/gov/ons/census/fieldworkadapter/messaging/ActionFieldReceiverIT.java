@@ -5,6 +5,7 @@ import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static uk.gov.ons.census.fieldworkadapter.testutils.MessageConstructor.constructMessage;
 import static uk.gov.ons.census.fieldworkadapter.utils.Constants.OUTBOUND_EVENT_SCHEMA_VERSION;
@@ -23,6 +24,7 @@ import org.springframework.test.context.ContextConfiguration;
 import org.springframework.test.context.TestPropertySource;
 import org.springframework.test.context.junit.jupiter.SpringExtension;
 import uk.gov.ons.census.common.model.entity.EventType;
+import uk.gov.ons.census.fieldworkadapter.logging.EventLogger;
 import uk.gov.ons.census.fieldworkadapter.model.dto.Address;
 import uk.gov.ons.census.fieldworkadapter.model.dto.CaseUpdateDTO;
 import uk.gov.ons.census.fieldworkadapter.model.dto.EventDTO;
@@ -52,14 +54,21 @@ class ActionFieldReceiverIT {
     MessageSender messageSender() {
       return Mockito.mock(MessageSender.class);
     }
+
+    @Bean
+    EventLogger eventLogger() {
+      return Mockito.mock(EventLogger.class);
+    }
   }
 
   @Autowired private ActionFieldReceiver underTest;
   @Autowired private MessageSender messageSender;
+  @Autowired private EventLogger eventLogger;
 
   @BeforeEach
   void resetMocks() {
     Mockito.reset(messageSender);
+    Mockito.reset(eventLogger);
   }
 
   @Test
@@ -77,6 +86,7 @@ class ActionFieldReceiverIT {
     FwmtActionInstructionDTO published = (FwmtActionInstructionDTO) payloadCaptor.getValue();
     assertThat(published.getActionInstruction()).isEqualTo(FieldActionInstruction.CREATE);
     assertThat(published.getCaseId()).isEqualTo(event.getPayload().getCaseUpdate().getCaseId());
+    verify(eventLogger, times(1)).logEvent(any(), any(), any(), any(), any(Message.class));
   }
 
   @Test
@@ -95,15 +105,81 @@ class ActionFieldReceiverIT {
         (FwmtCancelActionInstructionDTO) payloadCaptor.getValue();
     assertThat(published.getActionInstruction()).isEqualTo(FieldActionInstruction.CANCEL);
     assertThat(published.getCaseId()).isEqualTo(event.getPayload().getCaseUpdate().getCaseId());
+    verify(eventLogger, times(1)).logEvent(any(), any(), any(), any(), any(Message.class));
+  }
+
+  @Test
+  void shouldPublishUpdateActionInstructionThroughSpringWiring() {
+    EventDTO event = buildEvent(FieldActionInstruction.UPDATE, "E", EventType.CASE_UPDATE);
+    Message<byte[]> message = constructMessage(event);
+
+    underTest.receiveMessage(message);
+
+    ArgumentCaptor<Object> payloadCaptor = ArgumentCaptor.forClass(Object.class);
+    verify(messageSender)
+        .sendMessage(eq("event_fieldwork_action-instruction"), payloadCaptor.capture());
+
+    assertThat(payloadCaptor.getValue()).isInstanceOf(FwmtActionInstructionDTO.class);
+    FwmtActionInstructionDTO published = (FwmtActionInstructionDTO) payloadCaptor.getValue();
+    assertThat(published.getActionInstruction()).isEqualTo(FieldActionInstruction.UPDATE);
+    assertThat(published.getCaseId()).isEqualTo(event.getPayload().getCaseUpdate().getCaseId());
+    verify(eventLogger, times(1)).logEvent(any(), any(), any(), any(), any(Message.class));
   }
 
   @Test
   void shouldSuppressNisraMessagesThroughSpringWiring() {
-    EventDTO event = buildEvent(FieldActionInstruction.UPDATE, "N", EventType.CASE_UPDATE);
+    // Owns "N" region across all instruction types — format variants are owned by the contract
+    // test.
+    EventDTO createEvent = buildEvent(FieldActionInstruction.CREATE, "N", EventType.CASE_UPDATE);
+    EventDTO updateEvent = buildEvent(FieldActionInstruction.UPDATE, "N", EventType.CASE_UPDATE);
+    EventDTO cancelEvent = buildEvent(FieldActionInstruction.CANCEL, "N", EventType.CASE_UPDATE);
 
-    underTest.receiveMessage(constructMessage(event));
+    underTest.receiveMessage(constructMessage(createEvent));
+    underTest.receiveMessage(constructMessage(updateEvent));
+    underTest.receiveMessage(constructMessage(cancelEvent));
 
     verify(messageSender, never()).sendMessage(any(), any());
+    verify(eventLogger, times(3)).logEvent(any(), any(), any(), any(), any(Message.class));
+  }
+
+  @Test
+  void shouldSuppressKnownNiRegionContractSamplesThroughSpringWiring() {
+    // "N" across all instructions is owned by shouldSuppressNisraMessagesThroughSpringWiring;
+    // this test focuses purely on region format detection: case-insensitive, prefix, and trim.
+    EventDTO niLowerCaseRegionOnly =
+        buildEvent(FieldActionInstruction.CREATE, "n", EventType.CASE_UPDATE);
+    EventDTO niOnsCode =
+        buildEvent(FieldActionInstruction.UPDATE, "N92000002", EventType.CASE_UPDATE);
+    EventDTO niLowerCaseOnsCode =
+        buildEvent(FieldActionInstruction.CANCEL, "n92000002", EventType.CASE_UPDATE);
+    EventDTO niCodeWithWhitespace =
+        buildEvent(FieldActionInstruction.CREATE, " N92000002 ", EventType.CASE_UPDATE);
+
+    underTest.receiveMessage(constructMessage(niLowerCaseRegionOnly));
+    underTest.receiveMessage(constructMessage(niOnsCode));
+    underTest.receiveMessage(constructMessage(niLowerCaseOnsCode));
+    underTest.receiveMessage(constructMessage(niCodeWithWhitespace));
+
+    verify(messageSender, never()).sendMessage(any(), any());
+    verify(eventLogger, times(4)).logEvent(any(), any(), any(), any(), any(Message.class));
+  }
+
+  @Test
+  void shouldPublishForNonNiRegionContractControlsThroughSpringWiring() {
+    // Verifies non-NI region codes publish through Spring wiring across all instruction types.
+    EventDTO englandCreate =
+        buildEvent(FieldActionInstruction.CREATE, "E92000001", EventType.CASE_UPDATE);
+    EventDTO walesUpdate =
+        buildEvent(FieldActionInstruction.UPDATE, "W92000004", EventType.CASE_UPDATE);
+    EventDTO scotlandCancel =
+        buildEvent(FieldActionInstruction.CANCEL, "S92000003", EventType.CASE_UPDATE);
+
+    underTest.receiveMessage(constructMessage(englandCreate));
+    underTest.receiveMessage(constructMessage(walesUpdate));
+    underTest.receiveMessage(constructMessage(scotlandCancel));
+
+    verify(messageSender, times(3)).sendMessage(eq("event_fieldwork_action-instruction"), any());
+    verify(eventLogger, times(3)).logEvent(any(), any(), any(), any(), any(Message.class));
   }
 
   @Test

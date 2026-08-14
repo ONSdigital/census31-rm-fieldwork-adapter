@@ -86,6 +86,40 @@ public class EventLogger {
     eventRepository.save(loggedEvent);
   }
 
+  public void logEvent(
+      String eventDescription,
+      EventType eventType,
+      EventDTO event,
+      Object eventPayload,
+      OffsetDateTime messageTimestamp) {
+
+    EventHeaderDTO eventHeader = event.getHeader();
+    OffsetDateTime eventDate = eventHeader.getDateTime();
+
+    Event loggedEvent =
+        buildEvent(
+            eventDate,
+            eventDescription,
+            eventType,
+            eventHeader,
+            RedactHelper.redact(eventPayload),
+            messageTimestamp);
+
+    eventRepository.save(loggedEvent);
+  }
+
+  public void logEvent(
+      String eventDescription,
+      EventType eventType,
+      EventDTO event,
+      Object eventPayload,
+      Message<byte[]> message) {
+
+    OffsetDateTime messageTimestamp = getMessageTimeStamp(message);
+
+    logEvent(eventDescription, eventType, event, eventPayload, messageTimestamp);
+  }
+
   private Event buildEvent(
       OffsetDateTime eventDate,
       String eventDescription,

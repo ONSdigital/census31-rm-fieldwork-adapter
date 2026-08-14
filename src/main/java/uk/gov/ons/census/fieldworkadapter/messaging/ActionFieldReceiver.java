@@ -2,8 +2,7 @@ package uk.gov.ons.census.fieldworkadapter.messaging;
 
 import static uk.gov.ons.census.fieldworkadapter.utils.JsonHelper.convertJsonBytesToEvent;
 
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
+import java.util.Locale;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.integration.annotation.MessageEndpoint;
 import org.springframework.integration.annotation.ServiceActivator;
@@ -11,6 +10,7 @@ import org.springframework.messaging.Message;
 import org.springframework.transaction.annotation.Isolation;
 import org.springframework.transaction.annotation.Transactional;
 import uk.gov.ons.census.common.model.entity.EventType;
+import uk.gov.ons.census.fieldworkadapter.logging.EventLogger;
 import uk.gov.ons.census.fieldworkadapter.model.dto.CaseUpdateDTO;
 import uk.gov.ons.census.fieldworkadapter.model.dto.EventDTO;
 import uk.gov.ons.census.fieldworkadapter.model.dto.EventHeaderDTO;
@@ -22,19 +22,22 @@ import uk.gov.ons.census.fieldworkadapter.utils.ActionInstructionMapper;
 @MessageEndpoint
 public class ActionFieldReceiver {
 
-  private static final Logger log = LoggerFactory.getLogger(ActionFieldReceiver.class);
   private static final String NISRA_REGION = "N";
 
   private final ActionInstructionMapper actionInstructionMapper;
   private final MessageSender messageSender;
+  private final EventLogger eventLogger;
 
   @Value("${queueconfig.fieldwork-action-instruction-topic}")
   private String fwmtActionInstructionTopic;
 
   public ActionFieldReceiver(
-      ActionInstructionMapper actionInstructionMapper, MessageSender messageSender) {
+      ActionInstructionMapper actionInstructionMapper,
+      MessageSender messageSender,
+      EventLogger eventLogger) {
     this.actionInstructionMapper = actionInstructionMapper;
     this.messageSender = messageSender;
+    this.eventLogger = eventLogger;
   }
 
   @Transactional(isolation = Isolation.REPEATABLE_READ)
@@ -49,15 +52,18 @@ public class ActionFieldReceiver {
 
     switch (header.getFieldActionInstruction()) {
       case null -> {
-        if (log.isInfoEnabled()) {
-          log.info(
-              "Ignoring CASE_UPDATE with null fieldActionInstruction, caseId={}",
-              caseUpdate.getCaseId());
-        }
+        eventLogger.logEvent(
+            "Ignoring CASE_UPDATE with null fieldActionInstruction",
+            EventType.CASE_UPDATE,
+            event,
+            caseUpdate,
+            message);
       }
-      case UPDATE -> handleForwardableInstruction(caseUpdate, FieldActionInstruction.UPDATE);
-      case CREATE -> handleForwardableInstruction(caseUpdate, FieldActionInstruction.CREATE);
-      case CANCEL -> handleCancelInstruction(caseUpdate);
+      case UPDATE ->
+          handleForwardableInstruction(event, message, caseUpdate, FieldActionInstruction.UPDATE);
+      case CREATE ->
+          handleForwardableInstruction(event, message, caseUpdate, FieldActionInstruction.CREATE);
+      case CANCEL -> handleCancelInstruction(event, message, caseUpdate);
       default ->
           throw new RuntimeException(
               String.format(
@@ -66,12 +72,15 @@ public class ActionFieldReceiver {
     }
   }
 
-  private void handleCancelInstruction(CaseUpdateDTO caseUpdate) {
+  private void handleCancelInstruction(
+      EventDTO event, Message<byte[]> message, CaseUpdateDTO caseUpdate) {
     if (isNisraCase(caseUpdate)) {
-      if (log.isInfoEnabled()) {
-        log.info(
-            "Skipping NISRA CASE_UPDATE for CANCEL instruction, caseId={}", caseUpdate.getCaseId());
-      }
+      eventLogger.logEvent(
+          "Skipping NISRA CASE_UPDATE for CANCEL instruction",
+          EventType.CASE_UPDATE,
+          event,
+          caseUpdate,
+          message);
       return;
     }
 
@@ -79,22 +88,26 @@ public class ActionFieldReceiver {
         actionInstructionMapper.toFwmtCancelActionInstruction(caseUpdate);
 
     messageSender.sendMessage(fwmtActionInstructionTopic, actionInstruction);
-
-    if (log.isInfoEnabled()) {
-      log.info(
-          "Published CANCEL fieldwork action instruction for caseId={}", caseUpdate.getCaseId());
-    }
+    eventLogger.logEvent(
+        "Published CANCEL fieldwork action instruction",
+        EventType.CASE_UPDATE,
+        event,
+        actionInstruction,
+        message);
   }
 
   private void handleForwardableInstruction(
-      CaseUpdateDTO caseUpdate, FieldActionInstruction fieldActionInstruction) {
+      EventDTO event,
+      Message<byte[]> message,
+      CaseUpdateDTO caseUpdate,
+      FieldActionInstruction fieldActionInstruction) {
     if (isNisraCase(caseUpdate)) {
-      if (log.isInfoEnabled()) {
-        log.info(
-            "Skipping NISRA CASE_UPDATE for {} instruction, caseId={}",
-            fieldActionInstruction,
-            caseUpdate.getCaseId());
-      }
+      eventLogger.logEvent(
+          String.format("Skipping NISRA CASE_UPDATE for %s instruction", fieldActionInstruction),
+          EventType.CASE_UPDATE,
+          event,
+          caseUpdate,
+          message);
       return;
     }
 
@@ -102,13 +115,12 @@ public class ActionFieldReceiver {
         actionInstructionMapper.toFwmtActionInstruction(caseUpdate, fieldActionInstruction);
 
     messageSender.sendMessage(fwmtActionInstructionTopic, actionInstruction);
-
-    if (log.isInfoEnabled()) {
-      log.info(
-          "Published {} fieldwork action instruction for caseId={}",
-          fieldActionInstruction,
-          caseUpdate.getCaseId());
-    }
+    eventLogger.logEvent(
+        String.format("Published %s fieldwork action instruction", fieldActionInstruction),
+        EventType.CASE_UPDATE,
+        event,
+        actionInstruction,
+        message);
   }
 
   private void validateEvent(EventDTO event) {
@@ -128,11 +140,15 @@ public class ActionFieldReceiver {
   }
 
   /**
-   * Returns {@code true} if the case is a NISRA case (region code "N"). NISRA cases must be
-   * excluded from fieldwork for the 2027 test.
+   * Returns {@code true} if the case is a NISRA case (region begins with "N", case-insensitive).
+   * NISRA cases must be excluded from fieldwork for the 2027 test.
    */
   private boolean isNisraCase(CaseUpdateDTO caseUpdate) {
-    return caseUpdate.getAddress() != null
-        && NISRA_REGION.equals(caseUpdate.getAddress().getRegion());
+    if (caseUpdate.getAddress() == null || caseUpdate.getAddress().getRegion() == null) {
+      return false;
+    }
+
+    String region = caseUpdate.getAddress().getRegion().trim();
+    return !region.isEmpty() && region.toUpperCase(Locale.ROOT).startsWith(NISRA_REGION);
   }
 }
