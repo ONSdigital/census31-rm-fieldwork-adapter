@@ -32,6 +32,46 @@ class EventLoggerTest {
   @InjectMocks EventLogger underTest;
 
   @Test
+  void testLogEventSuppliedDateTime() {
+    OffsetDateTime eventTime = OffsetDateTime.now();
+    OffsetDateTime messageTime = OffsetDateTime.now().minusSeconds(30);
+    EventHeaderDTO eventHeader =
+        EventHelper.createEventDTO("Test topic", TEST_CORRELATION_ID, TEST_ORIGINATING_USER);
+    eventHeader.setSource("Test source");
+    eventHeader.setChannel("Test channel");
+    eventHeader.setDateTime(eventTime);
+    EventDTO event = new EventDTO();
+    event.setHeader(eventHeader);
+
+    FwmtActionInstructionDTO actionInstruction = new FwmtActionInstructionDTO();
+    actionInstruction.setActionInstruction(FieldActionInstruction.CREATE);
+
+    underTest.logEvent(
+        "Published CREATE fieldwork action instruction",
+        EventType.CASE_UPDATE,
+        event,
+        actionInstruction,
+        messageTime);
+
+    ArgumentCaptor<Event> eventArgumentCaptor = ArgumentCaptor.forClass(Event.class);
+    verify(eventRepository).save(eventArgumentCaptor.capture());
+    Event actualEvent = eventArgumentCaptor.getValue();
+    assertThat(actualEvent.getUacQidLink()).isNull();
+    assertThat(actualEvent.getCaze()).isNull();
+    assertThat(eventTime).isEqualTo(actualEvent.getDateTime());
+    assertThat("Test source").isEqualTo(actualEvent.getSource());
+    assertThat("Test channel").isEqualTo(actualEvent.getChannel());
+    assertThat(EventType.CASE_UPDATE).isEqualTo(actualEvent.getType());
+    assertThat("Published CREATE fieldwork action instruction")
+        .isEqualTo(actualEvent.getDescription());
+    assertThat(eventHeader.getMessageId()).isEqualTo(actualEvent.getMessageId());
+    assertThat(eventHeader.getCorrelationId()).isEqualTo(actualEvent.getCorrelationId());
+    assertThat(eventHeader.getOriginatingUser()).isEqualTo(actualEvent.getCreatedBy());
+    assertThat(messageTime).isEqualTo(actualEvent.getMessageTimestamp());
+    assertThat(actualEvent.getPayload()).isNotBlank();
+  }
+
+  @Test
   void testLogEventDateTimeFromMessage() {
     OffsetDateTime eventTime = OffsetDateTime.now();
     EventHeaderDTO eventHeader =
@@ -45,7 +85,8 @@ class EventLoggerTest {
     FwmtActionInstructionDTO actionInstruction = new FwmtActionInstructionDTO();
     actionInstruction.setActionInstruction(FieldActionInstruction.CREATE);
 
-    Message<byte[]> message = mock(Message.class);
+    @SuppressWarnings("unchecked")
+    Message<byte[]> message = (Message<byte[]>) mock(Message.class);
 
     OffsetDateTime messageTime = OffsetDateTime.now().minusSeconds(3911);
     long timeStamp = messageTime.toInstant().toEpochMilli();
