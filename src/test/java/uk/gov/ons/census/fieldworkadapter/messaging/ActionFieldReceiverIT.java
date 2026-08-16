@@ -48,6 +48,8 @@ import uk.gov.ons.census.fieldworkadapter.utils.ActionInstructionMapper;
     })
 class ActionFieldReceiverIT {
 
+  public static final String TEST_TOPIC = "event_fieldwork_action-instruction";
+
   @Configuration
   static class TestConfig {
     @Bean
@@ -72,15 +74,14 @@ class ActionFieldReceiverIT {
   }
 
   @Test
-  void shouldPublishCreateActionInstructionThroughSpringWiring() {
+  void shouldPublishCreateActionInstruction() {
     EventDTO event = buildEvent(FieldActionInstruction.CREATE, "E", EventType.CASE_UPDATE);
     Message<byte[]> message = constructMessage(event);
 
     underTest.receiveMessage(message);
 
     ArgumentCaptor<Object> payloadCaptor = ArgumentCaptor.forClass(Object.class);
-    verify(messageSender)
-        .sendMessage(eq("event_fieldwork_action-instruction"), payloadCaptor.capture());
+    verify(messageSender).sendMessage(eq(TEST_TOPIC), payloadCaptor.capture());
 
     assertThat(payloadCaptor.getValue()).isInstanceOf(FwmtActionInstructionDTO.class);
     FwmtActionInstructionDTO published = (FwmtActionInstructionDTO) payloadCaptor.getValue();
@@ -90,15 +91,14 @@ class ActionFieldReceiverIT {
   }
 
   @Test
-  void shouldPublishCancelActionInstructionThroughSpringWiring() {
+  void shouldPublishCancelActionInstruction() {
     EventDTO event = buildEvent(FieldActionInstruction.CANCEL, "E", EventType.CASE_UPDATE);
     Message<byte[]> message = constructMessage(event);
 
     underTest.receiveMessage(message);
 
     ArgumentCaptor<Object> payloadCaptor = ArgumentCaptor.forClass(Object.class);
-    verify(messageSender)
-        .sendMessage(eq("event_fieldwork_action-instruction"), payloadCaptor.capture());
+    verify(messageSender).sendMessage(eq(TEST_TOPIC), payloadCaptor.capture());
 
     assertThat(payloadCaptor.getValue()).isInstanceOf(FwmtCancelActionInstructionDTO.class);
     FwmtCancelActionInstructionDTO published =
@@ -109,15 +109,14 @@ class ActionFieldReceiverIT {
   }
 
   @Test
-  void shouldPublishUpdateActionInstructionThroughSpringWiring() {
+  void shouldPublishUpdateActionInstruction() {
     EventDTO event = buildEvent(FieldActionInstruction.UPDATE, "E", EventType.CASE_UPDATE);
     Message<byte[]> message = constructMessage(event);
 
     underTest.receiveMessage(message);
 
     ArgumentCaptor<Object> payloadCaptor = ArgumentCaptor.forClass(Object.class);
-    verify(messageSender)
-        .sendMessage(eq("event_fieldwork_action-instruction"), payloadCaptor.capture());
+    verify(messageSender).sendMessage(eq(TEST_TOPIC), payloadCaptor.capture());
 
     assertThat(payloadCaptor.getValue()).isInstanceOf(FwmtActionInstructionDTO.class);
     FwmtActionInstructionDTO published = (FwmtActionInstructionDTO) payloadCaptor.getValue();
@@ -127,7 +126,7 @@ class ActionFieldReceiverIT {
   }
 
   @Test
-  void shouldSuppressNisraMessagesThroughSpringWiring() {
+  void shouldSuppressNisraMessages() {
     // Owns "N" region across all instruction types — format variants are owned by the contract
     // test.
     EventDTO createEvent = buildEvent(FieldActionInstruction.CREATE, "N", EventType.CASE_UPDATE);
@@ -143,7 +142,7 @@ class ActionFieldReceiverIT {
   }
 
   @Test
-  void shouldSuppressKnownNiRegionContractSamplesThroughSpringWiring() {
+  void shouldSuppressKnownNiRegionContractSamples() {
     // "N" across all instructions is owned by shouldSuppressNisraMessagesThroughSpringWiring;
     // this test focuses purely on region format detection: case-insensitive, prefix, and trim.
     EventDTO niLowerCaseRegionOnly =
@@ -165,7 +164,7 @@ class ActionFieldReceiverIT {
   }
 
   @Test
-  void shouldPublishForNonNiRegionContractControlsThroughSpringWiring() {
+  void shouldPublishForNonNiRegionContractControls() {
     // Verifies non-NI region codes publish through Spring wiring across all instruction types.
     EventDTO englandCreate =
         buildEvent(FieldActionInstruction.CREATE, "E92000001", EventType.CASE_UPDATE);
@@ -178,12 +177,12 @@ class ActionFieldReceiverIT {
     underTest.receiveMessage(constructMessage(walesUpdate));
     underTest.receiveMessage(constructMessage(scotlandCancel));
 
-    verify(messageSender, times(3)).sendMessage(eq("event_fieldwork_action-instruction"), any());
+    verify(messageSender, times(3)).sendMessage(eq(TEST_TOPIC), any());
     verify(eventLogger, times(3)).logEvent(any(), any(), any(), any(), any(Message.class));
   }
 
   @Test
-  void shouldRejectWrongMessageTypeThroughSpringWiring() {
+  void shouldRejectWrongMessageType() {
     EventDTO event = buildEvent(FieldActionInstruction.UPDATE, "E", EventType.NEW_CASE);
 
     RuntimeException thrown =

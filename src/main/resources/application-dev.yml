@@ -4,5 +4,3 @@ spring:
       pubsub:
         emulator-host: localhost:8538
         project-id: our-project
-
-caserefgeneratorkey: abc123
