@@ -1,10 +1,14 @@
 spring:
-  datasource:
-    url: jdbc:postgresql://localhost:16432/rm
-
   cloud:
     gcp:
       pubsub:
         emulator-host: localhost:18538
         project-id: our-project
+
+queueconfig:
+  case-update-subscription: event_case-update_rm-fieldwork-adapter
+  fieldwork-action-instruction-topic: event_fieldwork_action-instruction
+  publishtimeout: 5
+  retry:
+    max-attempts: 2
 

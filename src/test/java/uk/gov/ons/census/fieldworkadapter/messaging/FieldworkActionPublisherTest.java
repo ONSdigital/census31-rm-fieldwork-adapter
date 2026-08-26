@@ -1,4 +1,4 @@
-package uk.gov.ons.census.fieldworkadapter.schedule;
+package uk.gov.ons.census.fieldworkadapter.messaging;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
@@ -9,8 +9,8 @@ import static org.mockito.Mockito.when;
 
 import com.google.cloud.spring.pubsub.core.PubSubTemplate;
 import com.google.pubsub.v1.PubsubMessage;
+import java.util.Map;
 import java.util.concurrent.CompletableFuture;
-import java.util.concurrent.ExecutionException;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
 import org.junit.jupiter.api.BeforeEach;
@@ -21,14 +21,13 @@ import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.test.util.ReflectionTestUtils;
-import uk.gov.ons.census.common.model.entity.MessageToSend;
 
 @ExtendWith(MockitoExtension.class)
-class MessageToSendSenderTest {
+class FieldworkActionPublisherTest {
 
   @Mock private PubSubTemplate pubSubTemplate;
 
-  @InjectMocks private MessageToSendSender underTest;
+  @InjectMocks private FieldworkActionPublisher underTest;
 
   @BeforeEach
   void setUp() {
@@ -37,41 +36,32 @@ class MessageToSendSenderTest {
 
   @Test
   void shouldPublishMessageToConfiguredTopic() {
-    MessageToSend messageToSend = new MessageToSend();
-    messageToSend.setDestinationTopic("topic-a");
-    messageToSend.setMessageBody("{\"caseId\":\"1\"}");
-    when(pubSubTemplate.publish(eq(messageToSend.getDestinationTopic()), any()))
+    when(pubSubTemplate.publish(eq("topic-a"), any()))
         .thenReturn(CompletableFuture.completedFuture("message-id"));
 
-    underTest.sendMessage(messageToSend);
+    String publishedId =
+        underTest.sendMessage("topic-a", Map.of("caseId", "1"), Map.of("eventId", "e-1"));
 
     ArgumentCaptor<PubsubMessage> captor = ArgumentCaptor.forClass(PubsubMessage.class);
     verify(pubSubTemplate).publish(eq("topic-a"), captor.capture());
     assertThat(captor.getValue().getData().toStringUtf8()).isEqualTo("{\"caseId\":\"1\"}");
+    assertThat(captor.getValue().getAttributesMap()).containsEntry("eventId", "e-1");
+    assertThat(publishedId).isEqualTo("message-id");
   }
 
   @Test
   void shouldWrapExecutionExceptionAsRuntimeException() {
-    MessageToSend messageToSend = new MessageToSend();
-    messageToSend.setDestinationTopic("topic-a");
-    messageToSend.setMessageBody("payload");
-
     CompletableFuture<String> failedFuture = new CompletableFuture<>();
     failedFuture.completeExceptionally(new IllegalStateException("illegal state exception"));
-    when(pubSubTemplate.publish(eq(messageToSend.getDestinationTopic()), any()))
-        .thenReturn(failedFuture);
+    when(pubSubTemplate.publish(eq("topic-a"), any())).thenReturn(failedFuture);
 
-    assertThatThrownBy(() -> underTest.sendMessage(messageToSend))
-        .isInstanceOf(RuntimeException.class)
-        .hasCauseInstanceOf(ExecutionException.class);
+    assertThatThrownBy(() -> underTest.sendMessage("topic-a", "payload", Map.of()))
+        .isInstanceOf(PublishFailedException.class)
+        .hasCauseInstanceOf(java.util.concurrent.ExecutionException.class);
   }
 
   @Test
   void shouldWrapTimeoutExceptionAsRuntimeException() {
-    MessageToSend messageToSend = new MessageToSend();
-    messageToSend.setDestinationTopic("topic-a");
-    messageToSend.setMessageBody("payload");
-
     CompletableFuture<String> timeoutFuture =
         new CompletableFuture<>() {
           @Override
@@ -80,11 +70,10 @@ class MessageToSendSenderTest {
           }
         };
 
-    when(pubSubTemplate.publish(eq(messageToSend.getDestinationTopic()), any()))
-        .thenReturn(timeoutFuture);
+    when(pubSubTemplate.publish(eq("topic-a"), any())).thenReturn(timeoutFuture);
 
-    assertThatThrownBy(() -> underTest.sendMessage(messageToSend))
-        .isInstanceOf(RuntimeException.class)
+    assertThatThrownBy(() -> underTest.sendMessage("topic-a", "payload", Map.of()))
+        .isInstanceOf(PublishFailedException.class)
         .hasCauseInstanceOf(TimeoutException.class);
   }
 }

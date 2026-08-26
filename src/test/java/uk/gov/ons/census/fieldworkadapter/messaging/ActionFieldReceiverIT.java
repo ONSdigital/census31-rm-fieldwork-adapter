@@ -4,12 +4,15 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.lenient;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static uk.gov.ons.census.fieldworkadapter.testutils.MessageConstructor.constructMessage;
 import static uk.gov.ons.census.fieldworkadapter.utils.Constants.OUTBOUND_EVENT_SCHEMA_VERSION;
 
+import java.time.OffsetDateTime;
+import java.util.Map;
 import java.util.UUID;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -24,7 +27,6 @@ import org.springframework.test.context.ContextConfiguration;
 import org.springframework.test.context.TestPropertySource;
 import org.springframework.test.context.junit.jupiter.SpringExtension;
 import uk.gov.ons.census.common.model.entity.EventType;
-import uk.gov.ons.census.fieldworkadapter.logging.EventLogger;
 import uk.gov.ons.census.fieldworkadapter.model.dto.Address;
 import uk.gov.ons.census.fieldworkadapter.model.dto.CaseUpdateDTO;
 import uk.gov.ons.census.fieldworkadapter.model.dto.EventDTO;
@@ -44,7 +46,8 @@ import uk.gov.ons.census.fieldworkadapter.utils.ActionInstructionMapper;
     })
 @TestPropertySource(
     properties = {
-      "queueconfig.fieldwork-action-instruction-topic=event_fieldwork_action-instruction"
+      "queueconfig.fieldwork-action-instruction-topic=event_fieldwork_action-instruction",
+      "queueconfig.publishtimeout=5"
     })
 class ActionFieldReceiverIT {
 
@@ -53,24 +56,27 @@ class ActionFieldReceiverIT {
   @Configuration
   static class TestConfig {
     @Bean
-    MessageSender messageSender() {
-      return Mockito.mock(MessageSender.class);
+    FieldworkActionPublisher fieldworkActionPublisher() {
+      return Mockito.mock(FieldworkActionPublisher.class);
     }
 
     @Bean
-    EventLogger eventLogger() {
-      return Mockito.mock(EventLogger.class);
+    EventIdFactory eventIdFactory() {
+      return Mockito.mock(EventIdFactory.class);
     }
   }
 
   @Autowired private ActionFieldReceiver underTest;
-  @Autowired private MessageSender messageSender;
-  @Autowired private EventLogger eventLogger;
+  @Autowired private FieldworkActionPublisher fieldworkActionPublisher;
+  @Autowired private EventIdFactory eventIdFactory;
 
   @BeforeEach
   void resetMocks() {
-    Mockito.reset(messageSender);
-    Mockito.reset(eventLogger);
+    Mockito.reset(fieldworkActionPublisher);
+    Mockito.reset(eventIdFactory);
+    lenient()
+        .when(eventIdFactory.createDeterministicId(any(), any(), any()))
+        .thenReturn("event-id-it");
   }
 
   @Test
@@ -81,13 +87,24 @@ class ActionFieldReceiverIT {
     underTest.receiveMessage(message);
 
     ArgumentCaptor<Object> payloadCaptor = ArgumentCaptor.forClass(Object.class);
-    verify(messageSender).sendMessage(eq(TEST_TOPIC), payloadCaptor.capture());
+    @SuppressWarnings("unchecked")
+    ArgumentCaptor<Map<String, String>> attributesCaptor = ArgumentCaptor.forClass(Map.class);
+    verify(fieldworkActionPublisher)
+        .sendMessage(eq(TEST_TOPIC), payloadCaptor.capture(), attributesCaptor.capture());
 
     assertThat(payloadCaptor.getValue()).isInstanceOf(FwmtActionInstructionDTO.class);
     FwmtActionInstructionDTO published = (FwmtActionInstructionDTO) payloadCaptor.getValue();
     assertThat(published.getActionInstruction()).isEqualTo(FieldActionInstruction.CREATE);
     assertThat(published.getCaseId()).isEqualTo(event.getPayload().getCaseUpdate().getCaseId());
-    verify(eventLogger, times(1)).logEvent(any(), any(), any(), any(), any(Message.class));
+    assertThat(attributesCaptor.getValue())
+        .containsKeys(
+            "eventId",
+            "correlationId",
+            "caseId",
+            "eventType",
+            "schemaVersion",
+            "occurredAt",
+            "traceparent");
   }
 
   @Test
@@ -98,14 +115,14 @@ class ActionFieldReceiverIT {
     underTest.receiveMessage(message);
 
     ArgumentCaptor<Object> payloadCaptor = ArgumentCaptor.forClass(Object.class);
-    verify(messageSender).sendMessage(eq(TEST_TOPIC), payloadCaptor.capture());
+    verify(fieldworkActionPublisher).sendMessage(eq(TEST_TOPIC), payloadCaptor.capture(), any());
 
     assertThat(payloadCaptor.getValue()).isInstanceOf(FwmtCancelActionInstructionDTO.class);
     FwmtCancelActionInstructionDTO published =
         (FwmtCancelActionInstructionDTO) payloadCaptor.getValue();
     assertThat(published.getActionInstruction()).isEqualTo(FieldActionInstruction.CANCEL);
     assertThat(published.getCaseId()).isEqualTo(event.getPayload().getCaseUpdate().getCaseId());
-    verify(eventLogger, times(1)).logEvent(any(), any(), any(), any(), any(Message.class));
+    verify(fieldworkActionPublisher, times(1)).sendMessage(eq(TEST_TOPIC), any(), any());
   }
 
   @Test
@@ -116,13 +133,13 @@ class ActionFieldReceiverIT {
     underTest.receiveMessage(message);
 
     ArgumentCaptor<Object> payloadCaptor = ArgumentCaptor.forClass(Object.class);
-    verify(messageSender).sendMessage(eq(TEST_TOPIC), payloadCaptor.capture());
+    verify(fieldworkActionPublisher).sendMessage(eq(TEST_TOPIC), payloadCaptor.capture(), any());
 
     assertThat(payloadCaptor.getValue()).isInstanceOf(FwmtActionInstructionDTO.class);
     FwmtActionInstructionDTO published = (FwmtActionInstructionDTO) payloadCaptor.getValue();
     assertThat(published.getActionInstruction()).isEqualTo(FieldActionInstruction.UPDATE);
     assertThat(published.getCaseId()).isEqualTo(event.getPayload().getCaseUpdate().getCaseId());
-    verify(eventLogger, times(1)).logEvent(any(), any(), any(), any(), any(Message.class));
+    verify(fieldworkActionPublisher, times(1)).sendMessage(eq(TEST_TOPIC), any(), any());
   }
 
   @Test
@@ -137,8 +154,7 @@ class ActionFieldReceiverIT {
     underTest.receiveMessage(constructMessage(updateEvent));
     underTest.receiveMessage(constructMessage(cancelEvent));
 
-    verify(messageSender, never()).sendMessage(any(), any());
-    verify(eventLogger, times(3)).logEvent(any(), any(), any(), any(), any(Message.class));
+    verify(fieldworkActionPublisher, never()).sendMessage(any(), any(), any());
   }
 
   @Test
@@ -159,8 +175,7 @@ class ActionFieldReceiverIT {
     underTest.receiveMessage(constructMessage(niLowerCaseOnsCode));
     underTest.receiveMessage(constructMessage(niCodeWithWhitespace));
 
-    verify(messageSender, never()).sendMessage(any(), any());
-    verify(eventLogger, times(4)).logEvent(any(), any(), any(), any(), any(Message.class));
+    verify(fieldworkActionPublisher, never()).sendMessage(any(), any(), any());
   }
 
   @Test
@@ -177,17 +192,17 @@ class ActionFieldReceiverIT {
     underTest.receiveMessage(constructMessage(walesUpdate));
     underTest.receiveMessage(constructMessage(scotlandCancel));
 
-    verify(messageSender, times(3)).sendMessage(eq(TEST_TOPIC), any());
-    verify(eventLogger, times(3)).logEvent(any(), any(), any(), any(), any(Message.class));
+    verify(fieldworkActionPublisher, times(3)).sendMessage(eq(TEST_TOPIC), any(), any());
   }
 
   @Test
   void shouldRejectWrongMessageType() {
     EventDTO event = buildEvent(FieldActionInstruction.UPDATE, "E", EventType.NEW_CASE);
 
-    RuntimeException thrown =
+    NonRetryableEventException thrown =
         assertThrows(
-            RuntimeException.class, () -> underTest.receiveMessage(constructMessage(event)));
+            NonRetryableEventException.class,
+            () -> underTest.receiveMessage(constructMessage(event)));
 
     assertThat(thrown.getMessage()).contains("Event Type 'NEW_CASE' is invalid on this topic");
   }
@@ -198,6 +213,9 @@ class ActionFieldReceiverIT {
     header.setVersion(OUTBOUND_EVENT_SCHEMA_VERSION);
     header.setMessageType(messageType);
     header.setFieldActionInstruction(instruction);
+    header.setMessageId(UUID.randomUUID());
+    header.setCorrelationId(UUID.randomUUID());
+    header.setDateTime(OffsetDateTime.parse("2026-08-25T10:15:30Z"));
 
     Address address = new Address();
     address.setRegion(region);

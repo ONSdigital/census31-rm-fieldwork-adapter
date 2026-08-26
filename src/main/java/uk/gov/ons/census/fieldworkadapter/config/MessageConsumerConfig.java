@@ -12,23 +12,24 @@ import org.springframework.context.annotation.Configuration;
 import org.springframework.integration.channel.DirectChannel;
 import org.springframework.integration.handler.advice.RequestHandlerRetryAdvice;
 import org.springframework.messaging.MessageChannel;
-import org.springframework.retry.RetryListener;
-import uk.gov.ons.census.fieldworkadapter.messaging.ManagedMessageRecoverer;
+import org.springframework.retry.policy.SimpleRetryPolicy;
+import org.springframework.retry.support.RetryTemplate;
+import uk.gov.ons.census.fieldworkadapter.messaging.NonRetryableEventException;
 
 @Configuration
 public class MessageConsumerConfig {
-  private final ManagedMessageRecoverer managedMessageRecoverer;
   private final PubSubTemplate pubSubTemplate;
 
-  @Value("${spring.cloud.gcp.pubsub.project-id}")
+  @Value("${spring.cloud.gcp.pubsub.project-id:${spring.cloud.gcp.project-id:our-project}}")
   private String pubsubProject;
 
   @Value("${queueconfig.case-update-subscription}")
   private String caseUpdateSubscription;
 
-  public MessageConsumerConfig(
-      ManagedMessageRecoverer managedMessageRecoverer, PubSubTemplate pubSubTemplate) {
-    this.managedMessageRecoverer = managedMessageRecoverer;
+  @Value("${queueconfig.retry.max-attempts:3}")
+  private int maxRetryAttempts;
+
+  public MessageConsumerConfig(PubSubTemplate pubSubTemplate) {
     this.pubSubTemplate = pubSubTemplate;
   }
 
@@ -56,14 +57,11 @@ public class MessageConsumerConfig {
   @Bean
   public RequestHandlerRetryAdvice retryAdvice() {
     RequestHandlerRetryAdvice requestHandlerRetryAdvice = new RequestHandlerRetryAdvice();
-    requestHandlerRetryAdvice.setRecoveryCallback(managedMessageRecoverer);
+    RetryTemplate retryTemplate = new RetryTemplate();
+    retryTemplate.setRetryPolicy(
+        new SimpleRetryPolicy(
+            maxRetryAttempts, java.util.Map.of(NonRetryableEventException.class, false), true));
+    requestHandlerRetryAdvice.setRetryTemplate(retryTemplate);
     return requestHandlerRetryAdvice;
-  }
-
-  @Bean
-  public RetryListener retryListener() {
-    RetryListener retryListener = new DefaultListenerSupport();
-
-    return retryListener;
   }
 }

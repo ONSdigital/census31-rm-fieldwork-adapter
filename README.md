@@ -2,78 +2,110 @@
 
 Census Response Management (RM) Fieldwork Adapter.
 
-## Introduction
+## Overview
 
-The fieldwork adapter is a Spring Boot service that bridges between RM case events and the 2021-format
-fieldwork action instruction messages expected by FWMTG for the 2027 Census test.
+`census-rm-fieldwork-adapter` is a stateless Spring Boot microservice that transforms `CASE_UPDATE` events into fieldwork action instructions for FWMTG.
 
-It listens to `CASE_UPDATE` events from Pub/Sub, checks the optional `fieldActionInstruction` value in the event
-header, and decides whether that case update should be forwarded to fieldwork:
+It exists to keep fieldwork mapping logic out of upstream services and to provide one controlled place for:
+- validation
+- business filtering
+- transformation
+- publication to the fieldwork messaging contract
 
-- if `fieldActionInstruction` is `null`, the message is acknowledged and ignored
-- if `fieldActionInstruction` is `CREATE`, `UPDATE`, or `CANCEL`, the case update is converted into the equivalent
-  fieldwork action instruction message and published to the fieldwork action instruction topic
+## Architecture Summary
 
-This keeps the forwarding logic out of the services that produce case updates and centralises the conversion into the
-message format required by FWMTG.
-
-The adapter also applies a business rule for the 2027 test: cases in the NISRA region must not be sent to fieldwork.
-If a `CASE_UPDATE` relates to a Northern Ireland case (region beginning with `N`), the message is acknowledged but no
-action instruction is published.
-
-In practice, this means that when new non-NISRA cases are created and RM marks their `CASE_UPDATE` event with
-`fieldActionInstruction=CREATE`, the adapter publishes corresponding `CREATE` action instructions for FWMTG. Support for
-other fieldwork instructions, such as `UPDATE` and `CANCEL`, is handled through the same metadata-driven approach.
-
-## Building
-Podman and Docker are both supported for building and running the application.
-By default the Makefile will use `docker` unless you are on an `arm64` architecture (e.g. M1/M2 Mac) in which case it will use `podman`.
-You can override this by setting the `DOCKER` environment variable to either `docker` or `podman`.
-For example, to force using `docker` on an M1/M2 Mac:
-```shell
-DOCKER=docker make <command>
+```text
+case-processor -> case-update topic -> [subscription] -> fieldwork-adapter -> fieldwork-action-instruction topic -> FWMTG
 ```
 
-To run all the tests and build the image
+The service consumes from Pub/Sub, evaluates each case update, and publishes a mapped fieldwork instruction when required.
+
+### Why Direct Publish (and no outbox)
+
+The adapter is intentionally stateless and does not persist case state. Because there is no local business-state write to coordinate with outbound publish, there is no dual-write problem to solve in this service.
+
+For this reason, direct publish is the chosen architecture:
+- simpler operational model (no outbox table/poller lifecycle)
+- lower end-to-end latency (publish in-handler)
+- clearer ownership of retries/redelivery through Pub/Sub delivery semantics
+- cleaner separation from `census31-rm-case-processor`, where outbox remains the correct pattern for a stateful service
+
+This is a scoped architectural decision for this adapter only, based on current fieldwork requirements and implementation.
+
+## Processing Behaviour
+
+For each inbound `CASE_UPDATE`:
+1. Validate event type and required structure.
+2. If `fieldActionInstruction` is missing, ignore and acknowledge.
+3. If case region is NISRA (region starts with `N`), suppress publish.
+4. If instruction is `CREATE`, `UPDATE`, or `CANCEL`, map to FWMT instruction payload.
+5. Publish to `fieldwork-action-instruction` with message attributes (including deterministic `eventId`).
+
+## Reliability Model
+
+The adapter uses at-least-once messaging semantics.
+
+- Publish failures raise exceptions so the inbound message is not acknowledged.
+- Pub/Sub redelivery handles transient failure paths.
+- Duplicate delivery is expected in distributed messaging and must be handled idempotently by consumers.
+- Structured outcome logging provides operational and audit visibility for published, suppressed, and ignored decisions.
+
+## Key Configuration
+
+Application defaults are in `src/main/resources/application.yml`.
+
+Important properties:
+- `queueconfig.case-update-subscription`
+- `queueconfig.fieldwork-action-instruction-topic`
+- `queueconfig.publishtimeout`
+- `spring.cloud.gcp.pubsub.subscriber.parallel-pull-count`
+- `spring.cloud.gcp.pubsub.subscriber.executor-threads`
+- `spring.cloud.gcp.pubsub.subscriber.max-ack-extension-period`
+- `spring.cloud.gcp.pubsub.subscriber.flow-control.max-outstanding-element-count`
+
+## Build and Test
+
+Podman and Docker are both supported for build and local runs.
+
+The `Makefile` chooses a default runtime based on host architecture:
+- `amd64` -> `docker`
+- `arm64` (for example M1/M2 Mac) -> `podman`
+
+You can override this default at command time:
 
 ```shell
-   make build
+DOCKER=docker make build
 ```
 
-Just build the image
-
 ```shell
-    make build-no-test
+make build
+make build-no-test
+make test
 ```
 
 ### Local Docker Java Healthcheck
 
-Since docker compose health checks are run inside the container, we need a method of checking service health that can
-run in our minimal alpine Java JRE images. To accomplish this, we have a small Java health check class which simply
-calls a http endpoint and succeeds if it gets a success status. This is compiled into a JAR, which is then mounted into
-the containers, so it can be executed by the JRE at container runtime.
+Container health checks run inside the container image, so this repository also includes a tiny Java-based healthcheck helper used by local Docker Compose test flows.
 
-#### Building Changes
+If you change `src/test/resources/java_healthcheck/HealthCheck.java`, rebuild the jar and commit the generated update:
 
-If you make changes to the [HealthCheck.java](src/test/resources/java_healthcheck/HealthCheck.java), you must then
-run `make rebuild-java-healthcheck` to compile and package the updated class into the jar, and commit the resulting
-built changes.
+```shell
+make rebuild-java-healthcheck
+```
 
-## Debugging With PubSub Emulator
+## Local Development
 
-Make sure you have the following environment variables set if you want to run in the debugger in your IDE:
+To run with the Pub/Sub emulator, set:
 
 ```shell
 SPRING_CLOUD_GCP_PUBSUB_EMULATOR_HOST=localhost:8538
-QUEUECONFIG_PUBSUB-PROJECT=our-project
+SPRING_CLOUD_GCP_PUBSUB_PROJECT_ID=our-project
 ```
 
-## Debugging With GCP PubSub Project
-
-If you want to use real GCP PubSub topics and subscriptions, make sure you have the following environment variables set
-if you want to run in the debugger in your IDE:
+To run against a real GCP project, set:
 
 ```shell
-SPRING_CLOUD_GCP_PUBSUB_PROJECT-ID=<GCP Project>
-QUEUECONFIG_PUBSUB-PROJECT=<GCP Project>
+SPRING_CLOUD_GCP_PROJECT_ID=<GCP Project>
+SPRING_CLOUD_GCP_PUBSUB_PROJECT_ID=<GCP Project>
 ```
+

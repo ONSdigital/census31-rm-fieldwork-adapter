@@ -1,31 +1,24 @@
 package uk.gov.ons.census.fieldworkadapter.healthcheck;
 
-import static org.mockito.Mockito.verify;
+import static org.assertj.core.api.Assertions.assertThat;
 
-import java.util.UUID;
+import java.io.IOException;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.time.OffsetDateTime;
 import org.junit.jupiter.api.Test;
-import org.junit.jupiter.api.extension.ExtendWith;
-import org.mockito.InjectMocks;
-import org.mockito.Mock;
-import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.test.util.ReflectionTestUtils;
-import uk.gov.ons.census.fieldworkadapter.schedule.ClusterLeaderManager;
 
-@ExtendWith(MockitoExtension.class)
 public class HealthCheckTest {
-  @Mock private ClusterLeaderManager clusterLeaderManager;
-
-  @InjectMocks HealthCheck underTest;
-
   @Test
-  public void testHappyPath() {
-    // Given
-    ReflectionTestUtils.setField(underTest, "fileName", "/tmp/" + UUID.randomUUID());
+  public void testHappyPath() throws IOException {
+    HealthCheck underTest = new HealthCheck();
+    Path tempFile = Files.createTempFile("fieldwork-adapter-healthcheck", ".txt");
+    ReflectionTestUtils.setField(underTest, "fileName", tempFile.toString());
 
-    // When
     underTest.updateFileWithCurrentTimestamp();
 
-    // Then
-    verify(clusterLeaderManager).leaderKeepAlive();
+    String fileLine = Files.readString(tempFile).trim();
+    assertThat(OffsetDateTime.parse(fileLine)).isBeforeOrEqualTo(OffsetDateTime.now());
   }
 }

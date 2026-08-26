@@ -2,7 +2,10 @@ package uk.gov.ons.census.fieldworkadapter.messaging;
 
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyMap;
 import static org.mockito.ArgumentMatchers.anyString;
+import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.lenient;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
@@ -14,13 +17,13 @@ import java.util.UUID;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
+import org.mockito.ArgumentCaptor;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.messaging.Message;
 import org.springframework.test.util.ReflectionTestUtils;
 import uk.gov.ons.census.common.model.entity.EventType;
-import uk.gov.ons.census.fieldworkadapter.logging.EventLogger;
 import uk.gov.ons.census.fieldworkadapter.model.dto.Address;
 import uk.gov.ons.census.fieldworkadapter.model.dto.CaseUpdateDTO;
 import uk.gov.ons.census.fieldworkadapter.model.dto.EventDTO;
@@ -37,14 +40,17 @@ class ActionFieldReceiverTest {
   private static final String TEST_TOPIC = "event_fieldwork_action-instruction";
 
   @Mock private ActionInstructionMapper actionInstructionMapper;
-  @Mock private MessageSender messageSender;
-  @Mock private EventLogger eventLogger;
+  @Mock private FieldworkActionPublisher fieldworkActionPublisher;
+  @Mock private EventIdFactory eventIdFactory;
 
   @InjectMocks private ActionFieldReceiver underTest;
 
   @BeforeEach
   void setUp() {
     ReflectionTestUtils.setField(underTest, "fwmtActionInstructionTopic", TEST_TOPIC);
+    lenient()
+        .when(eventIdFactory.createDeterministicId(any(), any(), anyString()))
+        .thenReturn("event-id-123");
   }
 
   @Test
@@ -54,8 +60,7 @@ class ActionFieldReceiverTest {
 
     underTest.receiveMessage(message);
 
-    verify(messageSender, never()).sendMessage(any(), any());
-    verify(eventLogger).logEvent(anyString(), any(), any(), any(), any(Message.class));
+    verify(fieldworkActionPublisher, never()).sendMessage(anyString(), any(), anyMap());
   }
 
   @Test
@@ -68,13 +73,26 @@ class ActionFieldReceiverTest {
     when(actionInstructionMapper.toFwmtActionInstruction(
             event.getPayload().getCaseUpdate(), FieldActionInstruction.CREATE))
         .thenReturn(mapped);
+    when(fieldworkActionPublisher.sendMessage(eq(TEST_TOPIC), eq(mapped), anyMap()))
+        .thenReturn("pubsub-id-1");
 
     underTest.receiveMessage(message);
 
     verify(actionInstructionMapper)
         .toFwmtActionInstruction(event.getPayload().getCaseUpdate(), FieldActionInstruction.CREATE);
-    verify(messageSender).sendMessage(TEST_TOPIC, mapped);
-    verify(eventLogger).logEvent(anyString(), any(), any(), any(), any(Message.class));
+    ArgumentCaptor<java.util.Map<String, String>> attributesCaptor =
+        ArgumentCaptor.forClass(java.util.Map.class);
+    verify(fieldworkActionPublisher)
+        .sendMessage(eq(TEST_TOPIC), eq(mapped), attributesCaptor.capture());
+    org.assertj.core.api.Assertions.assertThat(attributesCaptor.getValue())
+        .containsKeys(
+            "eventId",
+            "correlationId",
+            "caseId",
+            "eventType",
+            "schemaVersion",
+            "occurredAt",
+            "traceparent");
   }
 
   @Test
@@ -87,13 +105,14 @@ class ActionFieldReceiverTest {
     when(actionInstructionMapper.toFwmtActionInstruction(
             event.getPayload().getCaseUpdate(), FieldActionInstruction.UPDATE))
         .thenReturn(mapped);
+    when(fieldworkActionPublisher.sendMessage(eq(TEST_TOPIC), eq(mapped), anyMap()))
+        .thenReturn("pubsub-id-2");
 
     underTest.receiveMessage(message);
 
     verify(actionInstructionMapper)
         .toFwmtActionInstruction(event.getPayload().getCaseUpdate(), FieldActionInstruction.UPDATE);
-    verify(messageSender).sendMessage(TEST_TOPIC, mapped);
-    verify(eventLogger).logEvent(anyString(), any(), any(), any(), any(Message.class));
+    verify(fieldworkActionPublisher).sendMessage(eq(TEST_TOPIC), eq(mapped), anyMap());
   }
 
   @Test
@@ -105,13 +124,14 @@ class ActionFieldReceiverTest {
     mapped.setActionInstruction(FieldActionInstruction.CANCEL);
     when(actionInstructionMapper.toFwmtCancelActionInstruction(event.getPayload().getCaseUpdate()))
         .thenReturn(mapped);
+    when(fieldworkActionPublisher.sendMessage(eq(TEST_TOPIC), eq(mapped), anyMap()))
+        .thenReturn("pubsub-id-3");
 
     underTest.receiveMessage(message);
 
     verify(actionInstructionMapper)
         .toFwmtCancelActionInstruction(event.getPayload().getCaseUpdate());
-    verify(messageSender).sendMessage(TEST_TOPIC, mapped);
-    verify(eventLogger).logEvent(anyString(), any(), any(), any(), any(Message.class));
+    verify(fieldworkActionPublisher).sendMessage(eq(TEST_TOPIC), eq(mapped), anyMap());
   }
 
   @Test
@@ -127,10 +147,9 @@ class ActionFieldReceiverTest {
     underTest.receiveMessage(constructMessage(updateEvent));
     underTest.receiveMessage(constructMessage(cancelEvent));
 
-    verify(messageSender, never()).sendMessage(any(), any());
+    verify(fieldworkActionPublisher, never()).sendMessage(anyString(), any(), anyMap());
     verify(actionInstructionMapper, never()).toFwmtActionInstruction(any(), any());
     verify(actionInstructionMapper, never()).toFwmtCancelActionInstruction(any());
-    verify(eventLogger, times(3)).logEvent(anyString(), any(), any(), any(), any(Message.class));
   }
 
   @Test
@@ -151,10 +170,9 @@ class ActionFieldReceiverTest {
     underTest.receiveMessage(constructMessage(niLowerCaseOnsCode));
     underTest.receiveMessage(constructMessage(niCodeWithWhitespace));
 
-    verify(messageSender, never()).sendMessage(any(), any());
+    verify(fieldworkActionPublisher, never()).sendMessage(anyString(), any(), anyMap());
     verify(actionInstructionMapper, never()).toFwmtActionInstruction(any(), any());
     verify(actionInstructionMapper, never()).toFwmtCancelActionInstruction(any());
-    verify(eventLogger, times(4)).logEvent(anyString(), any(), any(), any(), any(Message.class));
   }
 
   @Test
@@ -197,18 +215,20 @@ class ActionFieldReceiverTest {
 
     verify(actionInstructionMapper, times(6)).toFwmtActionInstruction(any(), any());
     verify(actionInstructionMapper, times(3)).toFwmtCancelActionInstruction(any());
-    verify(messageSender, times(6)).sendMessage(TEST_TOPIC, mappedForward);
-    verify(messageSender, times(3)).sendMessage(TEST_TOPIC, mappedCancel);
-    verify(eventLogger, times(9)).logEvent(anyString(), any(), any(), any(), any(Message.class));
+    verify(fieldworkActionPublisher, times(6))
+        .sendMessage(eq(TEST_TOPIC), eq(mappedForward), anyMap());
+    verify(fieldworkActionPublisher, times(3))
+        .sendMessage(eq(TEST_TOPIC), eq(mappedCancel), anyMap());
   }
 
   @Test
   void shouldThrowForWrongMessageType() {
     EventDTO event = buildEvent(FieldActionInstruction.UPDATE, "E", EventType.NEW_CASE, true);
 
-    RuntimeException thrown =
+    NonRetryableEventException thrown =
         assertThrows(
-            RuntimeException.class, () -> underTest.receiveMessage(constructMessage(event)));
+            NonRetryableEventException.class,
+            () -> underTest.receiveMessage(constructMessage(event)));
 
     org.assertj.core.api.Assertions.assertThat(thrown.getMessage())
         .contains("Event Type 'NEW_CASE' is invalid on this topic");
@@ -218,12 +238,29 @@ class ActionFieldReceiverTest {
   void shouldThrowWhenCaseUpdatePayloadMissing() {
     EventDTO event = buildEvent(FieldActionInstruction.UPDATE, "E", EventType.CASE_UPDATE, false);
 
-    RuntimeException thrown =
+    NonRetryableEventException thrown =
         assertThrows(
-            RuntimeException.class, () -> underTest.receiveMessage(constructMessage(event)));
+            NonRetryableEventException.class,
+            () -> underTest.receiveMessage(constructMessage(event)));
 
     org.assertj.core.api.Assertions.assertThat(thrown.getMessage())
         .isEqualTo("Invalid CASE_UPDATE event: payload.caseUpdate is missing");
+  }
+
+  @Test
+  void shouldPropagatePublishFailures() {
+    EventDTO event = buildEvent(FieldActionInstruction.CREATE, "E", EventType.CASE_UPDATE, true);
+    Message<byte[]> message = constructMessage(event);
+
+    FwmtActionInstructionDTO mapped = new FwmtActionInstructionDTO();
+    mapped.setActionInstruction(FieldActionInstruction.CREATE);
+    when(actionInstructionMapper.toFwmtActionInstruction(
+            event.getPayload().getCaseUpdate(), FieldActionInstruction.CREATE))
+        .thenReturn(mapped);
+    when(fieldworkActionPublisher.sendMessage(eq(TEST_TOPIC), eq(mapped), anyMap()))
+        .thenThrow(new PublishFailedException("publish failed", new RuntimeException("boom")));
+
+    assertThrows(PublishFailedException.class, () -> underTest.receiveMessage(message));
   }
 
   private EventDTO buildEvent(
@@ -235,6 +272,9 @@ class ActionFieldReceiverTest {
     header.setVersion(OUTBOUND_EVENT_SCHEMA_VERSION);
     header.setFieldActionInstruction(instruction);
     header.setMessageType(messageType);
+    header.setCorrelationId(UUID.randomUUID());
+    header.setMessageId(UUID.randomUUID());
+    header.setDateTime(java.time.OffsetDateTime.parse("2026-08-25T10:15:30Z"));
 
     PayloadDTO payload = new PayloadDTO();
     if (includeCaseUpdate) {

@@ -2,67 +2,48 @@ spring:
   task:
     scheduling:
       pool:
-        size: 30
-
-  datasource:
-    url: jdbc:postgresql://localhost:6432/rm
-    username: appuser
-    password: postgres
-    driverClassName: org.postgresql.Driver
-    hikari:
-      maximumPoolSize: 50
-
-  sql:
-    init:
-      mode: always
-
-  jpa:
-    database-platform: org.hibernate.dialect.PostgreSQLDialect
-    hibernate:
-      ddl-auto: validate
-    properties:
-      hibernate:
-        default_schema: cases
-        jdbc:
-          batch_size: 1000
-          order_inserts: true
-          lob:
-            non_contextual_creation: true
-
+        size: 2
+  autoconfigure:
+    exclude:
+      - org.springframework.boot.autoconfigure.jdbc.DataSourceAutoConfiguration
+      - org.springframework.boot.autoconfigure.jdbc.DataSourceTransactionManagerAutoConfiguration
+      - org.springframework.boot.autoconfigure.orm.jpa.HibernateJpaAutoConfiguration
+      - org.springframework.boot.autoconfigure.data.jpa.JpaRepositoriesAutoConfiguration
+      - org.springframework.boot.autoconfigure.flyway.FlywayAutoConfiguration
+  # Keep service bootable in emulator environments even when no explicit Spring profile is set.
   cloud:
     gcp:
+      credentials:
+        enabled: ${SPRING_CLOUD_GCP_CREDENTIALS_ENABLED:false}
+      project-id: ${SPRING_CLOUD_GCP_PROJECT_ID:${SPRING_CLOUD_GCP_PUBSUB_PROJECT_ID:our-project}}
       pubsub:
+        credentials:
+          enabled: ${SPRING_CLOUD_GCP_PUBSUB_CREDENTIALS_ENABLED:false}
+        project-id: ${SPRING_CLOUD_GCP_PUBSUB_PROJECT_ID:${SPRING_CLOUD_GCP_PROJECT_ID:our-project}}
+        emulator-host: ${SPRING_CLOUD_GCP_PUBSUB_EMULATOR_HOST:}
         subscriber:
+          parallel-pull-count: 2
+          executor-threads: 4
+          max-ack-extension-period: 300
           flow-control:
-            max-outstanding-element-count: 100
+            max-outstanding-element-count: 500
+            max-outstanding-request-bytes: 20971520
 
 queueconfig:
   case-update-subscription: event_case-update_rm-fieldwork-adapter
   fieldwork-action-instruction-topic: event_fieldwork_action-instruction
-  publishtimeout: 30  # In seconds
+  publishtimeout: 10  # In seconds
+  retry:
+    max-attempts: 3
 
 healthcheck:
   frequency: 15000 #milliseconds
   filename: /tmp/fieldwork-adapter-healthy
-
-exceptionmanager:
-  connection:
-    scheme: http
-    host: localhost
-    port: 8666
-
-messagelogging:
-  logstacktraces: false
 
 logging:
   profile: DEV
   level:
     root: INFO
     com.google.cloud.spring.pubsub.integration.inbound.PubSubInboundChannelAdapter: ERROR
-
-scheduler:
-  frequency: 1000 #milliseconds
-  chunksize: 1000
-  leaderDeathTimeout: 120 #seconds
 
 
