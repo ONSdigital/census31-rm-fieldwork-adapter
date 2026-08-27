@@ -39,7 +39,7 @@ For each inbound `CASE_UPDATE`:
 2. If `fieldActionInstruction` is missing, ignore and acknowledge.
 3. If case region is NISRA (region starts with `N`), suppress publish.
 4. If instruction is `CREATE`, `UPDATE`, or `CANCEL`, map to FWMT instruction payload.
-5. Publish to `fieldwork-action-instruction` with message attributes (including deterministic `eventId`).
+5. Publish to `fieldwork-action-instruction` with message attributes (including the inbound `eventId` when available).
 
 ## Reliability Model
 

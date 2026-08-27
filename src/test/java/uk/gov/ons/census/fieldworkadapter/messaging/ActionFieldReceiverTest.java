@@ -5,7 +5,6 @@ import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyMap;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.eq;
-import static org.mockito.Mockito.lenient;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
@@ -41,16 +40,12 @@ class ActionFieldReceiverTest {
 
   @Mock private ActionInstructionMapper actionInstructionMapper;
   @Mock private FieldworkActionPublisher fieldworkActionPublisher;
-  @Mock private EventIdFactory eventIdFactory;
 
   @InjectMocks private ActionFieldReceiver underTest;
 
   @BeforeEach
   void setUp() {
     ReflectionTestUtils.setField(underTest, "fwmtActionInstructionTopic", TEST_TOPIC);
-    lenient()
-        .when(eventIdFactory.createDeterministicId(any(), any(), anyString()))
-        .thenReturn("event-id-123");
   }
 
   @Test
@@ -80,19 +75,15 @@ class ActionFieldReceiverTest {
 
     verify(actionInstructionMapper)
         .toFwmtActionInstruction(event.getPayload().getCaseUpdate(), FieldActionInstruction.CREATE);
+    @SuppressWarnings("unchecked")
     ArgumentCaptor<java.util.Map<String, String>> attributesCaptor =
         ArgumentCaptor.forClass(java.util.Map.class);
     verify(fieldworkActionPublisher)
         .sendMessage(eq(TEST_TOPIC), eq(mapped), attributesCaptor.capture());
     org.assertj.core.api.Assertions.assertThat(attributesCaptor.getValue())
+        .containsEntry("eventId", event.getHeader().getMessageId().toString())
         .containsKeys(
-            "eventId",
-            "correlationId",
-            "caseId",
-            "eventType",
-            "schemaVersion",
-            "occurredAt",
-            "traceparent");
+            "correlationId", "caseId", "eventType", "schemaVersion", "occurredAt", "traceparent");
   }
 
   @Test

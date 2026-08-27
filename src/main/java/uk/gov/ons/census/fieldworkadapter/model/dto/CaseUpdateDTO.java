@@ -11,7 +11,6 @@ public class CaseUpdateDTO {
   private UUID collectionExerciseId;
   private UUID surveyId;
   private boolean invalid;
-  // private RefusalTypeDTO refusalReceived;
   private boolean surveyLaunched;
   private boolean receiptReceived;
   private OffsetDateTime createdAt;
@@ -32,6 +31,9 @@ public class CaseUpdateDTO {
   private String fieldOfficerId;
   private String treatmentCode;
   private Integer ceExpectedCapacity;
+  private Integer ceActualResponses;
+  private Boolean undeliveredAsAddress;
+  private Boolean blankFormReturned;
   private boolean secureEstablishment;
   private String printBatch;
 }

@@ -1,9 +1,12 @@
 package uk.gov.ons.census.fieldworkadapter.model.dto;
 
+import com.fasterxml.jackson.annotation.JsonInclude;
+import com.fasterxml.jackson.annotation.JsonInclude.Include;
 import java.util.UUID;
 import lombok.Data;
 
 @Data
+@JsonInclude(Include.NON_NULL)
 public class FwmtActionInstructionDTO {
   private FieldActionInstruction actionInstruction;
   private String surveyName;
@@ -25,11 +28,9 @@ public class FwmtActionInstructionDTO {
   private String oa;
   private Double latitude;
   private Double longitude;
-  private boolean ce1Complete;
-  private boolean handDeliver;
   private Integer ceExpectedCapacity;
-  private int ceActualResponses;
+  private Integer ceActualResponses;
   private Boolean undeliveredAsAddress;
   private Boolean blankFormReturned;
-  private boolean secureEstablishment;
+  private Boolean secureEstablishment;
 }

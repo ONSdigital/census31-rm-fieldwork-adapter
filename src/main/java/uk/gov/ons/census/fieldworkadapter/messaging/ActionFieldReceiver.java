@@ -31,18 +31,15 @@ public class ActionFieldReceiver {
 
   private final ActionInstructionMapper actionInstructionMapper;
   private final FieldworkActionPublisher fieldworkActionPublisher;
-  private final EventIdFactory eventIdFactory;
 
   @Value("${queueconfig.fieldwork-action-instruction-topic}")
   private String fwmtActionInstructionTopic;
 
   public ActionFieldReceiver(
       ActionInstructionMapper actionInstructionMapper,
-      FieldworkActionPublisher fieldworkActionPublisher,
-      EventIdFactory eventIdFactory) {
+      FieldworkActionPublisher fieldworkActionPublisher) {
     this.actionInstructionMapper = actionInstructionMapper;
     this.fieldworkActionPublisher = fieldworkActionPublisher;
-    this.eventIdFactory = eventIdFactory;
   }
 
   @ServiceActivator(inputChannel = "actionFieldInputChannel", adviceChain = "retryAdvice")
@@ -55,9 +52,7 @@ public class ActionFieldReceiver {
     CaseUpdateDTO caseUpdate = event.getPayload().getCaseUpdate();
 
     switch (header.getFieldActionInstruction()) {
-      case null -> {
-        logOutcome("IGNORED_NO_INSTRUCTION", event, caseUpdate, null, message, null);
-      }
+      case null -> logOutcome("IGNORED_NO_INSTRUCTION", caseUpdate, null);
       case UPDATE ->
           handleForwardableInstruction(event, message, caseUpdate, FieldActionInstruction.UPDATE);
       case CREATE ->
@@ -74,24 +69,20 @@ public class ActionFieldReceiver {
   private void handleCancelInstruction(
       EventDTO event, Message<byte[]> message, CaseUpdateDTO caseUpdate) {
     if (isNisraCase(caseUpdate)) {
-      logOutcome(
-          "SUPPRESSED_NISRA", event, caseUpdate, FieldActionInstruction.CANCEL, message, null);
+      logOutcome("SUPPRESSED_NISRA", caseUpdate, FieldActionInstruction.CANCEL);
       return;
     }
 
     FwmtCancelActionInstructionDTO actionInstruction =
         actionInstructionMapper.toFwmtCancelActionInstruction(caseUpdate);
 
-    Map<String, String> attributes =
-        buildAttributes(event, caseUpdate, FieldActionInstruction.CANCEL, message);
+    Map<String, String> attributes = buildAttributes(event, caseUpdate, message);
     try {
-      String pubSubMessageId =
-          fieldworkActionPublisher.sendMessage(
-              fwmtActionInstructionTopic, actionInstruction, attributes);
-      logOutcome(
-          "PUBLISHED", event, caseUpdate, FieldActionInstruction.CANCEL, message, pubSubMessageId);
+      fieldworkActionPublisher.sendMessage(
+          fwmtActionInstructionTopic, actionInstruction, attributes);
+      logOutcome("PUBLISHED", caseUpdate, FieldActionInstruction.CANCEL);
     } catch (PublishFailedException ex) {
-      logOutcome("PUBLISH_FAILED", event, caseUpdate, FieldActionInstruction.CANCEL, message, null);
+      logOutcome("PUBLISH_FAILED", caseUpdate, FieldActionInstruction.CANCEL);
       throw ex;
     }
   }
@@ -102,22 +93,20 @@ public class ActionFieldReceiver {
       CaseUpdateDTO caseUpdate,
       FieldActionInstruction fieldActionInstruction) {
     if (isNisraCase(caseUpdate)) {
-      logOutcome("SUPPRESSED_NISRA", event, caseUpdate, fieldActionInstruction, message, null);
+      logOutcome("SUPPRESSED_NISRA", caseUpdate, fieldActionInstruction);
       return;
     }
 
     FwmtActionInstructionDTO actionInstruction =
         actionInstructionMapper.toFwmtActionInstruction(caseUpdate, fieldActionInstruction);
 
-    Map<String, String> attributes =
-        buildAttributes(event, caseUpdate, fieldActionInstruction, message);
+    Map<String, String> attributes = buildAttributes(event, caseUpdate, message);
     try {
-      String pubSubMessageId =
-          fieldworkActionPublisher.sendMessage(
-              fwmtActionInstructionTopic, actionInstruction, attributes);
-      logOutcome("PUBLISHED", event, caseUpdate, fieldActionInstruction, message, pubSubMessageId);
+      fieldworkActionPublisher.sendMessage(
+          fwmtActionInstructionTopic, actionInstruction, attributes);
+      logOutcome("PUBLISHED", caseUpdate, fieldActionInstruction);
     } catch (PublishFailedException ex) {
-      logOutcome("PUBLISH_FAILED", event, caseUpdate, fieldActionInstruction, message, null);
+      logOutcome("PUBLISH_FAILED", caseUpdate, fieldActionInstruction);
       throw ex;
     }
   }
@@ -141,14 +130,10 @@ public class ActionFieldReceiver {
   }
 
   private Map<String, String> buildAttributes(
-      EventDTO event,
-      CaseUpdateDTO caseUpdate,
-      FieldActionInstruction instruction,
-      Message<byte[]> message) {
+      EventDTO event, CaseUpdateDTO caseUpdate, Message<byte[]> message) {
     EventHeaderDTO header = event.getHeader();
     Map<String, String> attributes = new LinkedHashMap<>();
-    attributes.put(
-        "eventId", eventIdFactory.createDeterministicId(header, caseUpdate, instruction.name()));
+    attributes.put("eventId", extractEventId(message, header));
     attributes.put(
         "correlationId",
         header.getCorrelationId() == null ? "" : header.getCorrelationId().toString());
@@ -168,25 +153,12 @@ public class ActionFieldReceiver {
   }
 
   private void logOutcome(
-      String outcome,
-      EventDTO event,
-      CaseUpdateDTO caseUpdate,
-      FieldActionInstruction instruction,
-      Message<byte[]> message,
-      String pubSubMessageId) {
-    EventHeaderDTO header = event.getHeader();
+      String outcome, CaseUpdateDTO caseUpdate, FieldActionInstruction instruction) {
     log.atInfo()
         .setMessage("Fieldwork action processing outcome")
         .addKeyValue("outcome", outcome)
         .addKeyValue("caseId", caseUpdate.getCaseId())
-        .addKeyValue(
-            "eventId",
-            eventIdFactory.createDeterministicId(
-                header, caseUpdate, instruction == null ? "" : instruction.name()))
         .addKeyValue("fieldActionInstruction", instruction)
-        .addKeyValue("inboundMessageId", extractInboundMessageId(message, header))
-        .addKeyValue("pubsubMessageId", pubSubMessageId)
-        .addKeyValue("traceparent", extractTraceparent(message))
         .log();
   }
 
@@ -195,7 +167,7 @@ public class ActionFieldReceiver {
     return traceparent == null ? "" : traceparent.toString();
   }
 
-  private String extractInboundMessageId(Message<byte[]> message, EventHeaderDTO header) {
+  private String extractEventId(Message<byte[]> message, EventHeaderDTO header) {
     if (header.getMessageId() != null) {
       return header.getMessageId().toString();
     }

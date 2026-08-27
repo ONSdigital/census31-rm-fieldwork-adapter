@@ -9,7 +9,9 @@ import uk.gov.ons.census.fieldworkadapter.model.dto.FwmtCancelActionInstructionD
 @Component
 public class ActionInstructionMapper {
 
-  private static final String SURVEY_NAME = "CENSUS";
+  private static final String SURVEY_NAME = "Census";
+  private static final String CE_ADDRESS_TYPE = "CE";
+  private static final String CE_UNIT_ADDRESS_LEVEL = "U";
 
   public FwmtActionInstructionDTO toFwmtActionInstruction(
       CaseUpdateDTO caseUpdate, FieldActionInstruction actionInstruction) {
@@ -17,28 +19,20 @@ public class ActionInstructionMapper {
     mapped.setActionInstruction(actionInstruction);
     mapped.setSurveyName(SURVEY_NAME);
     mapped.setCaseId(caseUpdate.getCaseId());
-    mapped.setCaseRef(caseUpdate.getCaseRef());
-    mapped.setOa(caseUpdate.getOa());
-    mapped.setFieldCoordinatorId(caseUpdate.getFieldCoordinatorId());
-    mapped.setFieldOfficerId(caseUpdate.getFieldOfficerId());
-    mapped.setCeExpectedCapacity(caseUpdate.getCeExpectedCapacity());
-    mapped.setSecureEstablishment(caseUpdate.isSecureEstablishment());
-    mapped.setCe1Complete(isCeComplete(caseUpdate));
 
     if (caseUpdate.getAddress() != null) {
       mapped.setAddressType(caseUpdate.getAddress().getAddressType());
-      mapped.setAddressLevel(caseUpdate.getAddress().getAddressLevel());
-      mapped.setEstabType(caseUpdate.getAddress().getEstabType());
-      mapped.setOrganisationName(caseUpdate.getAddress().getOrganisationName());
-      mapped.setUprn(caseUpdate.getAddress().getUprn());
-      mapped.setEstabUprn(caseUpdate.getAddress().getEstabUprn());
-      mapped.setAddressLine1(caseUpdate.getAddress().getAddressLine1());
-      mapped.setAddressLine2(caseUpdate.getAddress().getAddressLine2());
-      mapped.setAddressLine3(caseUpdate.getAddress().getAddressLine3());
-      mapped.setTownName(caseUpdate.getAddress().getTownName());
-      mapped.setPostcode(caseUpdate.getAddress().getPostcode());
-      mapped.setLatitude(parseCoordinate(caseUpdate.getAddress().getLatitude()));
-      mapped.setLongitude(parseCoordinate(caseUpdate.getAddress().getLongitude()));
+
+      if (isCeAddress(caseUpdate)) {
+        mapped.setAddressLevel(caseUpdate.getAddress().getAddressLevel());
+        if (actionInstruction == FieldActionInstruction.CREATE) {
+          mapCeCreateFields(caseUpdate, mapped);
+        } else if (actionInstruction == FieldActionInstruction.UPDATE) {
+          mapCeUpdateFields(caseUpdate, mapped);
+        }
+      } else {
+        mapHouseholdFields(caseUpdate, mapped);
+      }
     }
 
     return mapped;
@@ -49,21 +43,68 @@ public class ActionInstructionMapper {
     mapped.setActionInstruction(FieldActionInstruction.CANCEL);
     mapped.setSurveyName(SURVEY_NAME);
     mapped.setCaseId(caseUpdate.getCaseId());
-    mapped.setCeExpectedCapacity(caseUpdate.getCeExpectedCapacity());
 
     if (caseUpdate.getAddress() != null) {
       mapped.setAddressType(caseUpdate.getAddress().getAddressType());
-      mapped.setAddressLevel(caseUpdate.getAddress().getAddressLevel());
+      if (isCeAddress(caseUpdate)) {
+        mapped.setAddressLevel(caseUpdate.getAddress().getAddressLevel());
+      }
     }
 
     return mapped;
   }
 
-  private boolean isCeComplete(CaseUpdateDTO caseUpdate) {
+  private void mapHouseholdFields(CaseUpdateDTO caseUpdate, FwmtActionInstructionDTO mapped) {
+    mapped.setCaseRef(caseUpdate.getCaseRef());
+    mapped.setOa(caseUpdate.getOa());
+    mapped.setFieldOfficerId(caseUpdate.getFieldOfficerId());
+    mapped.setUndeliveredAsAddress(caseUpdate.getUndeliveredAsAddress());
+    mapped.setBlankFormReturned(caseUpdate.getBlankFormReturned());
+    mapSharedAddressFields(caseUpdate, mapped);
+  }
+
+  private void mapCeCreateFields(CaseUpdateDTO caseUpdate, FwmtActionInstructionDTO mapped) {
+    mapped.setCaseRef(caseUpdate.getCaseRef());
+    mapped.setOa(caseUpdate.getOa());
+    mapped.setFieldCoordinatorId(caseUpdate.getFieldCoordinatorId());
+    mapped.setFieldOfficerId(caseUpdate.getFieldOfficerId());
+    mapped.setCeExpectedCapacity(caseUpdate.getCeExpectedCapacity());
+    mapped.setCeActualResponses(caseUpdate.getCeActualResponses());
+    mapped.setSecureEstablishment(caseUpdate.isSecureEstablishment());
+    mapped.setEstabType(caseUpdate.getAddress().getEstabType());
+    mapped.setOrganisationName(caseUpdate.getAddress().getOrganisationName());
+    mapped.setUprn(caseUpdate.getAddress().getUprn());
+    if (isCeUnit(caseUpdate)) {
+      mapped.setEstabUprn(caseUpdate.getAddress().getEstabUprn());
+      mapped.setUndeliveredAsAddress(caseUpdate.getUndeliveredAsAddress());
+    }
+    mapSharedAddressFields(caseUpdate, mapped);
+  }
+
+  private void mapCeUpdateFields(CaseUpdateDTO caseUpdate, FwmtActionInstructionDTO mapped) {
+    mapped.setCeExpectedCapacity(caseUpdate.getCeExpectedCapacity());
+    mapped.setCeActualResponses(caseUpdate.getCeActualResponses());
+  }
+
+  private void mapSharedAddressFields(CaseUpdateDTO caseUpdate, FwmtActionInstructionDTO mapped) {
+    mapped.setEstabType(caseUpdate.getAddress().getEstabType());
+    mapped.setAddressLine1(caseUpdate.getAddress().getAddressLine1());
+    mapped.setAddressLine2(caseUpdate.getAddress().getAddressLine2());
+    mapped.setAddressLine3(caseUpdate.getAddress().getAddressLine3());
+    mapped.setTownName(caseUpdate.getAddress().getTownName());
+    mapped.setPostcode(caseUpdate.getAddress().getPostcode());
+    mapped.setLatitude(parseCoordinate(caseUpdate.getAddress().getLatitude()));
+    mapped.setLongitude(parseCoordinate(caseUpdate.getAddress().getLongitude()));
+  }
+
+  private boolean isCeAddress(CaseUpdateDTO caseUpdate) {
     return caseUpdate.getAddress() != null
-        && "CE".equals(caseUpdate.getAddress().getAddressType())
-        && "E".equals(caseUpdate.getAddress().getAddressLevel())
-        && caseUpdate.isReceiptReceived();
+        && CE_ADDRESS_TYPE.equals(caseUpdate.getAddress().getAddressType());
+  }
+
+  private boolean isCeUnit(CaseUpdateDTO caseUpdate) {
+    return isCeAddress(caseUpdate)
+        && CE_UNIT_ADDRESS_LEVEL.equals(caseUpdate.getAddress().getAddressLevel());
   }
 
   private Double parseCoordinate(String value) {

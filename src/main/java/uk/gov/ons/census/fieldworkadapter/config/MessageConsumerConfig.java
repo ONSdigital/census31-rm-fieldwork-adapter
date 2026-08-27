@@ -12,6 +12,7 @@ import org.springframework.context.annotation.Configuration;
 import org.springframework.integration.channel.DirectChannel;
 import org.springframework.integration.handler.advice.RequestHandlerRetryAdvice;
 import org.springframework.messaging.MessageChannel;
+import org.springframework.retry.backoff.FixedBackOffPolicy;
 import org.springframework.retry.policy.SimpleRetryPolicy;
 import org.springframework.retry.support.RetryTemplate;
 import uk.gov.ons.census.fieldworkadapter.messaging.NonRetryableEventException;
@@ -28,6 +29,9 @@ public class MessageConsumerConfig {
 
   @Value("${queueconfig.retry.max-attempts:3}")
   private int maxRetryAttempts;
+
+  @Value("${queueconfig.retry.delay:1000}")
+  private long retryDelayMillis;
 
   public MessageConsumerConfig(PubSubTemplate pubSubTemplate) {
     this.pubSubTemplate = pubSubTemplate;
@@ -58,9 +62,12 @@ public class MessageConsumerConfig {
   public RequestHandlerRetryAdvice retryAdvice() {
     RequestHandlerRetryAdvice requestHandlerRetryAdvice = new RequestHandlerRetryAdvice();
     RetryTemplate retryTemplate = new RetryTemplate();
+    FixedBackOffPolicy fixedBackOffPolicy = new FixedBackOffPolicy();
+    fixedBackOffPolicy.setBackOffPeriod(retryDelayMillis);
     retryTemplate.setRetryPolicy(
         new SimpleRetryPolicy(
             maxRetryAttempts, java.util.Map.of(NonRetryableEventException.class, false), true));
+    retryTemplate.setBackOffPolicy(fixedBackOffPolicy);
     requestHandlerRetryAdvice.setRetryTemplate(retryTemplate);
     return requestHandlerRetryAdvice;
   }

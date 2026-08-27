@@ -22,12 +22,12 @@ spring:
         project-id: ${SPRING_CLOUD_GCP_PUBSUB_PROJECT_ID:${SPRING_CLOUD_GCP_PROJECT_ID:our-project}}
         emulator-host: ${SPRING_CLOUD_GCP_PUBSUB_EMULATOR_HOST:}
         subscriber:
-          parallel-pull-count: 2
-          executor-threads: 4
+          parallel-pull-count: ${PUBSUB_SUBSCRIBER_PARALLEL_PULL_COUNT:2}
+          executor-threads: ${PUBSUB_SUBSCRIBER_EXECUTOR_THREADS:4}
           max-ack-extension-period: 300
           flow-control:
-            max-outstanding-element-count: 500
-            max-outstanding-request-bytes: 20971520
+            max-outstanding-element-count: ${PUBSUB_SUBSCRIBER_MAX_OUTSTANDING_ELEMENT_COUNT:500}
+            max-outstanding-request-bytes: ${PUBSUB_SUBSCRIBER_MAX_OUTSTANDING_REQUEST_BYTES:20971520}
 
 queueconfig:
   case-update-subscription: event_case-update_rm-fieldwork-adapter
@@ -35,6 +35,7 @@ queueconfig:
   publishtimeout: 10  # In seconds
   retry:
     max-attempts: 3
+    delay: 1000 #milliseconds
 
 healthcheck:
   frequency: 15000 #milliseconds
