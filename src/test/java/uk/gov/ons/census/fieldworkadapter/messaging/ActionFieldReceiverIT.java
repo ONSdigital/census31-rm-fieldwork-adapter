@@ -267,10 +267,9 @@ class ActionFieldReceiverIT {
   void shouldRejectWrongMessageType() {
     EventDTO event = buildEvent(FieldActionInstruction.UPDATE, "E", EventType.NEW_CASE);
 
-    NonRetryableEventException thrown =
+    RuntimeException thrown =
         assertThrows(
-            NonRetryableEventException.class,
-            () -> underTest.receiveMessage(constructMessage(event)));
+            RuntimeException.class, () -> underTest.receiveMessage(constructMessage(event)));
 
     assertThat(thrown.getMessage()).contains("Event Type 'NEW_CASE' is invalid on this topic");
   }

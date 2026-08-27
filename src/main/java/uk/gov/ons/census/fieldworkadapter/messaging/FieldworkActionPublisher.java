@@ -23,8 +23,7 @@ public class FieldworkActionPublisher {
     this.pubSubTemplate = pubSubTemplate;
   }
 
-  public String sendMessage(
-      String destinationTopic, Object message, Map<String, String> attributes) {
+  public void sendMessage(String destinationTopic, Object message, Map<String, String> attributes) {
     PubsubMessage.Builder builder =
         PubsubMessage.newBuilder()
             .setData(ByteString.copyFromUtf8(JsonHelper.convertObjectToJson(message)));
@@ -37,13 +36,9 @@ public class FieldworkActionPublisher {
     CompletableFuture<String> future = pubSubTemplate.publish(destinationTopic, pubsubMessage);
 
     try {
-      return future.get(publishTimeout, TimeUnit.SECONDS);
+      future.get(publishTimeout, TimeUnit.SECONDS);
     } catch (InterruptedException | ExecutionException | TimeoutException e) {
-      if (e instanceof InterruptedException) {
-        Thread.currentThread().interrupt();
-      }
-      throw new PublishFailedException(
-          String.format("Failed to publish fieldwork message to topic '%s'", destinationTopic), e);
+      throw new RuntimeException(e);
     }
   }
 }

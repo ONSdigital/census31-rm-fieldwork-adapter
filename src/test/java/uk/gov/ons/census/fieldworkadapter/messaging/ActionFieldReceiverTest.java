@@ -5,6 +5,7 @@ import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyMap;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
@@ -68,8 +69,6 @@ class ActionFieldReceiverTest {
     when(actionInstructionMapper.toFwmtActionInstruction(
             event.getPayload().getCaseUpdate(), FieldActionInstruction.CREATE))
         .thenReturn(mapped);
-    when(fieldworkActionPublisher.sendMessage(eq(TEST_TOPIC), eq(mapped), anyMap()))
-        .thenReturn("pubsub-id-1");
 
     underTest.receiveMessage(message);
 
@@ -96,8 +95,6 @@ class ActionFieldReceiverTest {
     when(actionInstructionMapper.toFwmtActionInstruction(
             event.getPayload().getCaseUpdate(), FieldActionInstruction.UPDATE))
         .thenReturn(mapped);
-    when(fieldworkActionPublisher.sendMessage(eq(TEST_TOPIC), eq(mapped), anyMap()))
-        .thenReturn("pubsub-id-2");
 
     underTest.receiveMessage(message);
 
@@ -115,8 +112,6 @@ class ActionFieldReceiverTest {
     mapped.setActionInstruction(FieldActionInstruction.CANCEL);
     when(actionInstructionMapper.toFwmtCancelActionInstruction(event.getPayload().getCaseUpdate()))
         .thenReturn(mapped);
-    when(fieldworkActionPublisher.sendMessage(eq(TEST_TOPIC), eq(mapped), anyMap()))
-        .thenReturn("pubsub-id-3");
 
     underTest.receiveMessage(message);
 
@@ -216,10 +211,9 @@ class ActionFieldReceiverTest {
   void shouldThrowForWrongMessageType() {
     EventDTO event = buildEvent(FieldActionInstruction.UPDATE, "E", EventType.NEW_CASE, true);
 
-    NonRetryableEventException thrown =
+    RuntimeException thrown =
         assertThrows(
-            NonRetryableEventException.class,
-            () -> underTest.receiveMessage(constructMessage(event)));
+            RuntimeException.class, () -> underTest.receiveMessage(constructMessage(event)));
 
     org.assertj.core.api.Assertions.assertThat(thrown.getMessage())
         .contains("Event Type 'NEW_CASE' is invalid on this topic");
@@ -229,10 +223,9 @@ class ActionFieldReceiverTest {
   void shouldThrowWhenCaseUpdatePayloadMissing() {
     EventDTO event = buildEvent(FieldActionInstruction.UPDATE, "E", EventType.CASE_UPDATE, false);
 
-    NonRetryableEventException thrown =
+    RuntimeException thrown =
         assertThrows(
-            NonRetryableEventException.class,
-            () -> underTest.receiveMessage(constructMessage(event)));
+            RuntimeException.class, () -> underTest.receiveMessage(constructMessage(event)));
 
     org.assertj.core.api.Assertions.assertThat(thrown.getMessage())
         .isEqualTo("Invalid CASE_UPDATE event: payload.caseUpdate is missing");
@@ -248,10 +241,11 @@ class ActionFieldReceiverTest {
     when(actionInstructionMapper.toFwmtActionInstruction(
             event.getPayload().getCaseUpdate(), FieldActionInstruction.CREATE))
         .thenReturn(mapped);
-    when(fieldworkActionPublisher.sendMessage(eq(TEST_TOPIC), eq(mapped), anyMap()))
-        .thenThrow(new PublishFailedException("publish failed", new RuntimeException("boom")));
+    doThrow(new RuntimeException("publish failed"))
+        .when(fieldworkActionPublisher)
+        .sendMessage(eq(TEST_TOPIC), eq(mapped), anyMap());
 
-    assertThrows(PublishFailedException.class, () -> underTest.receiveMessage(message));
+    assertThrows(RuntimeException.class, () -> underTest.receiveMessage(message));
   }
 
   private EventDTO buildEvent(

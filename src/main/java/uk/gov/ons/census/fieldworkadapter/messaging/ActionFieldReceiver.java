@@ -59,7 +59,7 @@ public class ActionFieldReceiver {
           handleForwardableInstruction(event, message, caseUpdate, FieldActionInstruction.CREATE);
       case CANCEL -> handleCancelInstruction(event, message, caseUpdate);
       default ->
-          throw new NonRetryableEventException(
+          throw new RuntimeException(
               String.format(
                   "Unsupported fieldActionInstruction '%s' for caseId=%s",
                   header.getFieldActionInstruction(), caseUpdate.getCaseId()));
@@ -81,7 +81,7 @@ public class ActionFieldReceiver {
       fieldworkActionPublisher.sendMessage(
           fwmtActionInstructionTopic, actionInstruction, attributes);
       logOutcome("PUBLISHED", caseUpdate, FieldActionInstruction.CANCEL);
-    } catch (PublishFailedException ex) {
+    } catch (RuntimeException ex) {
       logOutcome("PUBLISH_FAILED", caseUpdate, FieldActionInstruction.CANCEL);
       throw ex;
     }
@@ -105,7 +105,7 @@ public class ActionFieldReceiver {
       fieldworkActionPublisher.sendMessage(
           fwmtActionInstructionTopic, actionInstruction, attributes);
       logOutcome("PUBLISHED", caseUpdate, fieldActionInstruction);
-    } catch (PublishFailedException ex) {
+    } catch (RuntimeException ex) {
       logOutcome("PUBLISH_FAILED", caseUpdate, fieldActionInstruction);
       throw ex;
     }
@@ -113,19 +113,17 @@ public class ActionFieldReceiver {
 
   private void validateEvent(EventDTO event) {
     if (event == null || event.getHeader() == null || event.getPayload() == null) {
-      throw new NonRetryableEventException(
-          "Invalid CASE_UPDATE event: missing header and/or payload");
+      throw new RuntimeException("Invalid CASE_UPDATE event: missing header and/or payload");
     }
 
     if (event.getHeader().getMessageType() != EventType.CASE_UPDATE) {
-      throw new NonRetryableEventException(
+      throw new RuntimeException(
           String.format(
               "Event Type '%s' is invalid on this topic", event.getHeader().getMessageType()));
     }
 
     if (event.getPayload().getCaseUpdate() == null) {
-      throw new NonRetryableEventException(
-          "Invalid CASE_UPDATE event: payload.caseUpdate is missing");
+      throw new RuntimeException("Invalid CASE_UPDATE event: payload.caseUpdate is missing");
     }
   }
 

@@ -39,14 +39,12 @@ class FieldworkActionPublisherTest {
     when(pubSubTemplate.publish(eq("topic-a"), any()))
         .thenReturn(CompletableFuture.completedFuture("message-id"));
 
-    String publishedId =
-        underTest.sendMessage("topic-a", Map.of("caseId", "1"), Map.of("eventId", "e-1"));
+    underTest.sendMessage("topic-a", Map.of("caseId", "1"), Map.of("eventId", "e-1"));
 
     ArgumentCaptor<PubsubMessage> captor = ArgumentCaptor.forClass(PubsubMessage.class);
     verify(pubSubTemplate).publish(eq("topic-a"), captor.capture());
     assertThat(captor.getValue().getData().toStringUtf8()).isEqualTo("{\"caseId\":\"1\"}");
     assertThat(captor.getValue().getAttributesMap()).containsEntry("eventId", "e-1");
-    assertThat(publishedId).isEqualTo("message-id");
   }
 
   @Test
@@ -56,7 +54,7 @@ class FieldworkActionPublisherTest {
     when(pubSubTemplate.publish(eq("topic-a"), any())).thenReturn(failedFuture);
 
     assertThatThrownBy(() -> underTest.sendMessage("topic-a", "payload", Map.of()))
-        .isInstanceOf(PublishFailedException.class)
+        .isInstanceOf(RuntimeException.class)
         .hasCauseInstanceOf(java.util.concurrent.ExecutionException.class);
   }
 
@@ -73,7 +71,24 @@ class FieldworkActionPublisherTest {
     when(pubSubTemplate.publish(eq("topic-a"), any())).thenReturn(timeoutFuture);
 
     assertThatThrownBy(() -> underTest.sendMessage("topic-a", "payload", Map.of()))
-        .isInstanceOf(PublishFailedException.class)
+        .isInstanceOf(RuntimeException.class)
         .hasCauseInstanceOf(TimeoutException.class);
+  }
+
+  @Test
+  void shouldWrapInterruptedExceptionAsRuntimeException() {
+    CompletableFuture<String> interruptedFuture =
+        new CompletableFuture<>() {
+          @Override
+          public String get(long timeout, TimeUnit unit) throws InterruptedException {
+            throw new InterruptedException("interrupted");
+          }
+        };
+
+    when(pubSubTemplate.publish(eq("topic-a"), any())).thenReturn(interruptedFuture);
+
+    assertThatThrownBy(() -> underTest.sendMessage("topic-a", "payload", Map.of()))
+        .isInstanceOf(RuntimeException.class)
+        .hasCauseInstanceOf(InterruptedException.class);
   }
 }

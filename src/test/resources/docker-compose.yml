@@ -1,3 +1,4 @@
+version: '2.1'
 services:
   pubsub-emulator-case-it:
     container_name: pubsub-emulator-case-it
@@ -16,3 +17,13 @@ services:
       - pubsub-emulator-case-it
     entrypoint: sh -c "/setup_pubsub.sh"
 
+  start_dependencies:
+    image: dadarek/wait-for-dependencies
+    depends_on:
+      uac-qid-case-it:
+        condition: service_healthy
+
+networks:
+  default:
+    external:
+      name: censusrmdockerdev_default
