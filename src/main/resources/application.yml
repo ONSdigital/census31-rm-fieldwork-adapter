@@ -1,0 +1,44 @@
+spring:
+  task:
+    scheduling:
+      pool:
+        size: 15
+
+  autoconfigure:
+    exclude:
+      - org.springframework.boot.autoconfigure.jdbc.DataSourceAutoConfiguration
+      - org.springframework.boot.autoconfigure.jdbc.DataSourceTransactionManagerAutoConfiguration
+      - org.springframework.boot.autoconfigure.orm.jpa.HibernateJpaAutoConfiguration
+      - org.springframework.boot.autoconfigure.data.jpa.JpaRepositoriesAutoConfiguration
+      - org.springframework.boot.autoconfigure.flyway.FlywayAutoConfiguration
+
+  cloud:
+    gcp:
+      pubsub:
+        subscriber:
+          flow-control:
+            max-outstanding-element-count: 100
+
+queueconfig:
+  case-update-subscription: event_case-update_rm-fieldwork-adapter
+  fieldwork-action-instruction-topic: event_fieldwork_action-instruction
+  publishtimeout: 10  # In seconds
+
+healthcheck:
+  frequency: 15000 #milliseconds
+  filename: /tmp/fieldwork-adapter-healthy
+
+exceptionmanager:
+  connection:
+    scheme: http
+    host: localhost
+    port: 8666
+
+messagelogging:
+  logstacktraces: false
+
+logging:
+  profile: DEV
+  level:
+    root: INFO
+    com.google.cloud.spring.pubsub.integration.inbound.PubSubInboundChannelAdapter: ERROR
