@@ -81,8 +81,7 @@ class ActionFieldReceiverTest {
         .sendMessage(eq(TEST_TOPIC), eq(mapped), attributesCaptor.capture());
     org.assertj.core.api.Assertions.assertThat(attributesCaptor.getValue())
         .containsEntry("eventId", event.getHeader().getMessageId().toString())
-        .containsKeys(
-            "correlationId", "caseId", "eventType", "schemaVersion", "occurredAt", "traceparent");
+        .containsKeys("correlationId", "caseId", "eventType", "schemaVersion", "occurredAt");
   }
 
   @Test

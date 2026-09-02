@@ -89,8 +89,7 @@ class ActionFieldReceiverIT {
     assertThat(published.getCaseId()).isEqualTo(event.getPayload().getCaseUpdate().getCaseId());
     assertThat(attributesCaptor.getValue())
         .containsEntry("eventId", event.getHeader().getMessageId().toString())
-        .containsKeys(
-            "correlationId", "caseId", "eventType", "schemaVersion", "occurredAt", "traceparent");
+        .containsKeys("correlationId", "caseId", "eventType", "schemaVersion", "occurredAt");
   }
 
   @Test

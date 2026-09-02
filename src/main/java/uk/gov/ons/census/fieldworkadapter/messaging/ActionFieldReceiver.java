@@ -146,7 +146,6 @@ public class ActionFieldReceiver {
             : header.getVersion());
     attributes.put(
         "occurredAt", header.getDateTime() == null ? "" : header.getDateTime().toString());
-    attributes.put("traceparent", extractTraceparent(message));
     return attributes;
   }
 
@@ -158,11 +157,6 @@ public class ActionFieldReceiver {
         .addKeyValue("caseId", caseUpdate.getCaseId())
         .addKeyValue("fieldActionInstruction", instruction)
         .log();
-  }
-
-  private String extractTraceparent(Message<byte[]> message) {
-    Object traceparent = message.getHeaders().get("traceparent");
-    return traceparent == null ? "" : traceparent.toString();
   }
 
   private String extractEventId(Message<byte[]> message, EventHeaderDTO header) {
