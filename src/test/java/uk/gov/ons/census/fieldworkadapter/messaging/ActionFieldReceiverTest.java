@@ -127,14 +127,36 @@ class ActionFieldReceiverTest {
         buildEvent(FieldActionInstruction.CREATE, "N92000002", EventType.CASE_UPDATE);
     EventDTO scotlandUpdate =
         buildEvent(FieldActionInstruction.UPDATE, " S92000003 ", EventType.CASE_UPDATE);
-    EventDTO scotlandCancel =
-        buildEvent(FieldActionInstruction.CANCEL, "s92000003", EventType.CASE_UPDATE);
 
     underTest.receiveMessage(constructMessage(northernIrelandCreate));
     underTest.receiveMessage(constructMessage(scotlandUpdate));
-    underTest.receiveMessage(constructMessage(scotlandCancel));
 
     verify(fieldworkActionPublisher, never()).sendMessage(anyString(), any(), anyMap());
+  }
+
+  @Test
+  void shouldSuppressCancelForNisraRegionOnly() {
+    EventDTO northernIrelandCancel =
+        buildEvent(FieldActionInstruction.CANCEL, "N92000002", EventType.CASE_UPDATE);
+    EventDTO scotlandCancel =
+        buildEvent(FieldActionInstruction.CANCEL, "s92000003", EventType.CASE_UPDATE);
+    EventDTO englandCancel =
+        buildEvent(FieldActionInstruction.CANCEL, "E12000004", EventType.CASE_UPDATE);
+
+    underTest.receiveMessage(constructMessage(northernIrelandCancel));
+    underTest.receiveMessage(constructMessage(scotlandCancel));
+    underTest.receiveMessage(constructMessage(englandCancel));
+
+    ArgumentCaptor<Object> payloadCaptor = ArgumentCaptor.forClass(Object.class);
+    verify(fieldworkActionPublisher, times(2))
+        .sendMessage(eq(TEST_TOPIC), payloadCaptor.capture(), anyMap());
+
+    assertThat(payloadCaptor.getAllValues())
+        .hasSize(2)
+        .allSatisfy(
+            payload ->
+                assertThat(((FwmtCancelActionInstructionDTO) payload).getActionInstruction())
+                    .isEqualTo(FieldActionInstruction.CANCEL));
   }
 
   @Test

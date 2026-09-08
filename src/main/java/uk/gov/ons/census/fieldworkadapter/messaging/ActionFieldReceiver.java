@@ -72,13 +72,8 @@ public class ActionFieldReceiver {
 
   private void handleCancelInstruction(
       EventDTO event, Message<byte[]> message, CaseUpdateDTO caseUpdate) {
-    var exclusion = fieldFollowUpFilter.exclusionFor(caseUpdate);
-    if (exclusion.isPresent()) {
-      logOutcome(
-          "SUPPRESSED_INVALID_FOR_FIELD_FOLLOWUP",
-          caseUpdate,
-          FieldActionInstruction.CANCEL,
-          exclusion.get());
+    if (isNisraCase(caseUpdate)) {
+      logOutcome("SUPPRESSED_NISRA", caseUpdate, FieldActionInstruction.CANCEL, null);
       return;
     }
 
@@ -94,6 +89,14 @@ public class ActionFieldReceiver {
       logOutcome("PUBLISH_FAILED", caseUpdate, FieldActionInstruction.CANCEL, null);
       throw ex;
     }
+  }
+
+  private boolean isNisraCase(CaseUpdateDTO caseUpdate) {
+    if (caseUpdate.getAddress() == null || caseUpdate.getAddress().getRegion() == null) {
+      return false;
+    }
+    String region = caseUpdate.getAddress().getRegion().trim().toUpperCase();
+    return !region.isEmpty() && region.startsWith("N");
   }
 
   private void handleForwardableInstruction(
