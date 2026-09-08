@@ -5,6 +5,7 @@ import static uk.gov.ons.census.fieldworkadapter.utils.JsonHelper.convertJsonByt
 import com.google.cloud.spring.pubsub.support.BasicAcknowledgeablePubsubMessage;
 import com.google.cloud.spring.pubsub.support.GcpPubSubHeaders;
 import java.util.LinkedHashMap;
+import java.util.Locale;
 import java.util.Map;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -40,7 +41,7 @@ public class ActionFieldReceiver {
       "SUPPRESSED_INVALID_FOR_FIELD_FOLLOWUP";
 
   // NISRA region constants
-  private static final String NISRA_REGION_PREFIX = "N";
+  private static final String NISRA_REGION = "N";
 
   // Attribute key constants
   private static final String ATTR_EVENT_ID = "eventId";
@@ -115,12 +116,17 @@ public class ActionFieldReceiver {
     }
   }
 
+  /**
+   * Returns {@code true} if the case is a NISRA case (region begins with "N", case-insensitive).
+   * NISRA cases must be excluded from fieldwork for the 2027 test.
+   */
   private boolean isNisraCase(CaseUpdateDTO caseUpdate) {
     if (caseUpdate.getAddress() == null || caseUpdate.getAddress().getRegion() == null) {
       return false;
     }
-    String region = caseUpdate.getAddress().getRegion().trim().toUpperCase();
-    return !region.isEmpty() && region.startsWith(NISRA_REGION_PREFIX);
+
+    String region = caseUpdate.getAddress().getRegion().trim();
+    return !region.isEmpty() && region.toUpperCase(Locale.ROOT).startsWith(NISRA_REGION);
   }
 
   private void handleForwardableInstruction(
