@@ -26,8 +26,32 @@ import uk.gov.ons.census.fieldworkadapter.utils.ActionInstructionMapper;
 @MessageEndpoint
 public class ActionFieldReceiver {
   private static final Logger log = LoggerFactory.getLogger(ActionFieldReceiver.class);
+
+  // Event and message constants
   private static final String EVENT_TYPE = "CASE_UPDATE";
   private static final String SCHEMA_VERSION_UNKNOWN = "unknown";
+
+  // Outcome logging constants
+  private static final String OUTCOME_IGNORED_NO_INSTRUCTION = "IGNORED_NO_INSTRUCTION";
+  private static final String OUTCOME_PUBLISHED = "PUBLISHED";
+  private static final String OUTCOME_PUBLISH_FAILED = "PUBLISH_FAILED";
+  private static final String OUTCOME_SUPPRESSED_NISRA = "SUPPRESSED_NISRA";
+  private static final String OUTCOME_SUPPRESSED_INVALID_FOR_FIELD_FOLLOWUP =
+      "SUPPRESSED_INVALID_FOR_FIELD_FOLLOWUP";
+
+  // NISRA region constants
+  private static final String NISRA_REGION_PREFIX = "N";
+
+  // Attribute key constants
+  private static final String ATTR_EVENT_ID = "eventId";
+  private static final String ATTR_CORRELATION_ID = "correlationId";
+  private static final String ATTR_CASE_ID = "caseId";
+  private static final String ATTR_EVENT_TYPE = "eventType";
+  private static final String ATTR_SCHEMA_VERSION = "schemaVersion";
+  private static final String ATTR_OCCURRED_AT = "occurredAt";
+
+  // Empty value constant
+  private static final String EMPTY = "";
 
   private final ActionInstructionMapper actionInstructionMapper;
   private final FieldworkActionPublisher fieldworkActionPublisher;
@@ -56,7 +80,7 @@ public class ActionFieldReceiver {
     CaseUpdateDTO caseUpdate = event.getPayload().getCaseUpdate();
 
     switch (header.getFieldActionInstruction()) {
-      case null -> logOutcome("IGNORED_NO_INSTRUCTION", caseUpdate, null, null);
+      case null -> logOutcome(OUTCOME_IGNORED_NO_INSTRUCTION, caseUpdate, null, null);
       case UPDATE ->
           handleForwardableInstruction(event, message, caseUpdate, FieldActionInstruction.UPDATE);
       case CREATE ->
@@ -73,7 +97,7 @@ public class ActionFieldReceiver {
   private void handleCancelInstruction(
       EventDTO event, Message<byte[]> message, CaseUpdateDTO caseUpdate) {
     if (isNisraCase(caseUpdate)) {
-      logOutcome("SUPPRESSED_NISRA", caseUpdate, FieldActionInstruction.CANCEL, null);
+      logOutcome(OUTCOME_SUPPRESSED_NISRA, caseUpdate, FieldActionInstruction.CANCEL, null);
       return;
     }
 
@@ -84,9 +108,9 @@ public class ActionFieldReceiver {
     try {
       fieldworkActionPublisher.sendMessage(
           fwmtActionInstructionTopic, actionInstruction, attributes);
-      logOutcome("PUBLISHED", caseUpdate, FieldActionInstruction.CANCEL, null);
+      logOutcome(OUTCOME_PUBLISHED, caseUpdate, FieldActionInstruction.CANCEL, null);
     } catch (RuntimeException ex) {
-      logOutcome("PUBLISH_FAILED", caseUpdate, FieldActionInstruction.CANCEL, null);
+      logOutcome(OUTCOME_PUBLISH_FAILED, caseUpdate, FieldActionInstruction.CANCEL, null);
       throw ex;
     }
   }
@@ -96,7 +120,7 @@ public class ActionFieldReceiver {
       return false;
     }
     String region = caseUpdate.getAddress().getRegion().trim().toUpperCase();
-    return !region.isEmpty() && region.startsWith("N");
+    return !region.isEmpty() && region.startsWith(NISRA_REGION_PREFIX);
   }
 
   private void handleForwardableInstruction(
@@ -107,7 +131,7 @@ public class ActionFieldReceiver {
     var exclusion = fieldFollowUpFilter.exclusionFor(caseUpdate);
     if (exclusion.isPresent()) {
       logOutcome(
-          "SUPPRESSED_INVALID_FOR_FIELD_FOLLOWUP",
+          OUTCOME_SUPPRESSED_INVALID_FOR_FIELD_FOLLOWUP,
           caseUpdate,
           fieldActionInstruction,
           exclusion.get());
@@ -121,9 +145,9 @@ public class ActionFieldReceiver {
     try {
       fieldworkActionPublisher.sendMessage(
           fwmtActionInstructionTopic, actionInstruction, attributes);
-      logOutcome("PUBLISHED", caseUpdate, fieldActionInstruction, null);
+      logOutcome(OUTCOME_PUBLISHED, caseUpdate, fieldActionInstruction, null);
     } catch (RuntimeException ex) {
-      logOutcome("PUBLISH_FAILED", caseUpdate, fieldActionInstruction, null);
+      logOutcome(OUTCOME_PUBLISH_FAILED, caseUpdate, fieldActionInstruction, null);
       throw ex;
     }
   }
@@ -148,21 +172,21 @@ public class ActionFieldReceiver {
       EventDTO event, CaseUpdateDTO caseUpdate, Message<byte[]> message) {
     EventHeaderDTO header = event.getHeader();
     Map<String, String> attributes = new LinkedHashMap<>();
-    attributes.put("eventId", extractEventId(message, header));
+    attributes.put(ATTR_EVENT_ID, extractEventId(message, header));
     attributes.put(
-        "correlationId",
-        header.getCorrelationId() == null ? "" : header.getCorrelationId().toString());
+        ATTR_CORRELATION_ID,
+        header.getCorrelationId() == null ? EMPTY : header.getCorrelationId().toString());
     attributes.put(
-        "caseId", caseUpdate.getCaseId() == null ? "" : caseUpdate.getCaseId().toString());
+        ATTR_CASE_ID, caseUpdate.getCaseId() == null ? EMPTY : caseUpdate.getCaseId().toString());
     attributes.put(
-        "eventType", header.getMessageType() == null ? EVENT_TYPE : header.getMessageType().name());
+        ATTR_EVENT_TYPE, header.getMessageType() == null ? EVENT_TYPE : header.getMessageType().name());
     attributes.put(
-        "schemaVersion",
+        ATTR_SCHEMA_VERSION,
         header.getVersion() == null || header.getVersion().isBlank()
             ? SCHEMA_VERSION_UNKNOWN
             : header.getVersion());
     attributes.put(
-        "occurredAt", header.getDateTime() == null ? "" : header.getDateTime().toString());
+        ATTR_OCCURRED_AT, header.getDateTime() == null ? EMPTY : header.getDateTime().toString());
     return attributes;
   }
 
