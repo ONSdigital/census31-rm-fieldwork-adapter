@@ -5,7 +5,6 @@ import static uk.gov.ons.census.fieldworkadapter.utils.JsonHelper.convertJsonByt
 import com.google.cloud.spring.pubsub.support.BasicAcknowledgeablePubsubMessage;
 import com.google.cloud.spring.pubsub.support.GcpPubSubHeaders;
 import java.util.LinkedHashMap;
-import java.util.Locale;
 import java.util.Map;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -20,26 +19,31 @@ import uk.gov.ons.census.fieldworkadapter.model.dto.EventHeaderDTO;
 import uk.gov.ons.census.fieldworkadapter.model.dto.FieldActionInstruction;
 import uk.gov.ons.census.fieldworkadapter.model.dto.FwmtActionInstructionDTO;
 import uk.gov.ons.census.fieldworkadapter.model.dto.FwmtCancelActionInstructionDTO;
+import uk.gov.ons.census.fieldworkadapter.service.FieldFollowUpFilter;
+import uk.gov.ons.census.fieldworkadapter.service.FieldFollowUpFilter.Exclusion;
 import uk.gov.ons.census.fieldworkadapter.utils.ActionInstructionMapper;
 
 @MessageEndpoint
 public class ActionFieldReceiver {
   private static final Logger log = LoggerFactory.getLogger(ActionFieldReceiver.class);
-  private static final String NISRA_REGION = "N";
   private static final String EVENT_TYPE = "CASE_UPDATE";
   private static final String SCHEMA_VERSION_UNKNOWN = "unknown";
 
   private final ActionInstructionMapper actionInstructionMapper;
   private final FieldworkActionPublisher fieldworkActionPublisher;
-
-  @Value("${queueconfig.fieldwork-action-instruction-topic}")
-  private String fwmtActionInstructionTopic;
+  private final FieldFollowUpFilter fieldFollowUpFilter;
+  private final String fwmtActionInstructionTopic;
 
   public ActionFieldReceiver(
       ActionInstructionMapper actionInstructionMapper,
-      FieldworkActionPublisher fieldworkActionPublisher) {
+      FieldworkActionPublisher fieldworkActionPublisher,
+      FieldFollowUpFilter fieldFollowUpFilter,
+      @Value("${queueconfig.fieldwork-action-instruction-topic}")
+          String fwmtActionInstructionTopic) {
     this.actionInstructionMapper = actionInstructionMapper;
     this.fieldworkActionPublisher = fieldworkActionPublisher;
+    this.fieldFollowUpFilter = fieldFollowUpFilter;
+    this.fwmtActionInstructionTopic = fwmtActionInstructionTopic;
   }
 
   @ServiceActivator(inputChannel = "actionFieldInputChannel", adviceChain = "retryAdvice")
@@ -52,7 +56,7 @@ public class ActionFieldReceiver {
     CaseUpdateDTO caseUpdate = event.getPayload().getCaseUpdate();
 
     switch (header.getFieldActionInstruction()) {
-      case null -> logOutcome("IGNORED_NO_INSTRUCTION", caseUpdate, null);
+      case null -> logOutcome("IGNORED_NO_INSTRUCTION", caseUpdate, null, null);
       case UPDATE ->
           handleForwardableInstruction(event, message, caseUpdate, FieldActionInstruction.UPDATE);
       case CREATE ->
@@ -68,8 +72,13 @@ public class ActionFieldReceiver {
 
   private void handleCancelInstruction(
       EventDTO event, Message<byte[]> message, CaseUpdateDTO caseUpdate) {
-    if (isNisraCase(caseUpdate)) {
-      logOutcome("SUPPRESSED_NISRA", caseUpdate, FieldActionInstruction.CANCEL);
+    var exclusion = fieldFollowUpFilter.exclusionFor(caseUpdate);
+    if (exclusion.isPresent()) {
+      logOutcome(
+          "SUPPRESSED_INVALID_FOR_FIELD_FOLLOWUP",
+          caseUpdate,
+          FieldActionInstruction.CANCEL,
+          exclusion.get());
       return;
     }
 
@@ -80,9 +89,9 @@ public class ActionFieldReceiver {
     try {
       fieldworkActionPublisher.sendMessage(
           fwmtActionInstructionTopic, actionInstruction, attributes);
-      logOutcome("PUBLISHED", caseUpdate, FieldActionInstruction.CANCEL);
+      logOutcome("PUBLISHED", caseUpdate, FieldActionInstruction.CANCEL, null);
     } catch (RuntimeException ex) {
-      logOutcome("PUBLISH_FAILED", caseUpdate, FieldActionInstruction.CANCEL);
+      logOutcome("PUBLISH_FAILED", caseUpdate, FieldActionInstruction.CANCEL, null);
       throw ex;
     }
   }
@@ -92,8 +101,13 @@ public class ActionFieldReceiver {
       Message<byte[]> message,
       CaseUpdateDTO caseUpdate,
       FieldActionInstruction fieldActionInstruction) {
-    if (isNisraCase(caseUpdate)) {
-      logOutcome("SUPPRESSED_NISRA", caseUpdate, fieldActionInstruction);
+    var exclusion = fieldFollowUpFilter.exclusionFor(caseUpdate);
+    if (exclusion.isPresent()) {
+      logOutcome(
+          "SUPPRESSED_INVALID_FOR_FIELD_FOLLOWUP",
+          caseUpdate,
+          fieldActionInstruction,
+          exclusion.get());
       return;
     }
 
@@ -104,9 +118,9 @@ public class ActionFieldReceiver {
     try {
       fieldworkActionPublisher.sendMessage(
           fwmtActionInstructionTopic, actionInstruction, attributes);
-      logOutcome("PUBLISHED", caseUpdate, fieldActionInstruction);
+      logOutcome("PUBLISHED", caseUpdate, fieldActionInstruction, null);
     } catch (RuntimeException ex) {
-      logOutcome("PUBLISH_FAILED", caseUpdate, fieldActionInstruction);
+      logOutcome("PUBLISH_FAILED", caseUpdate, fieldActionInstruction, null);
       throw ex;
     }
   }
@@ -150,13 +164,22 @@ public class ActionFieldReceiver {
   }
 
   private void logOutcome(
-      String outcome, CaseUpdateDTO caseUpdate, FieldActionInstruction instruction) {
-    log.atInfo()
-        .setMessage("Fieldwork action processing outcome")
-        .addKeyValue("outcome", outcome)
-        .addKeyValue("caseId", caseUpdate.getCaseId())
-        .addKeyValue("fieldActionInstruction", instruction)
-        .log();
+      String outcome,
+      CaseUpdateDTO caseUpdate,
+      FieldActionInstruction instruction,
+      Exclusion exclusion) {
+    var logBuilder =
+        log.atInfo()
+            .setMessage("Fieldwork action processing outcome")
+            .addKeyValue("outcome", outcome)
+            .addKeyValue("caseId", caseUpdate.getCaseId())
+            .addKeyValue("fieldActionInstruction", instruction);
+
+    if (exclusion != null) {
+      logBuilder.addKeyValue("exclusionReason", exclusion.name());
+    }
+
+    logBuilder.log();
   }
 
   private String extractEventId(Message<byte[]> message, EventHeaderDTO header) {
@@ -170,18 +193,5 @@ public class ActionFieldReceiver {
     }
 
     return "";
-  }
-
-  /**
-   * Returns {@code true} if the case is a NISRA case (region begins with "N", case-insensitive).
-   * NISRA cases must be excluded from fieldwork for the 2027 test.
-   */
-  private boolean isNisraCase(CaseUpdateDTO caseUpdate) {
-    if (caseUpdate.getAddress() == null || caseUpdate.getAddress().getRegion() == null) {
-      return false;
-    }
-
-    String region = caseUpdate.getAddress().getRegion().trim();
-    return !region.isEmpty() && region.toUpperCase(Locale.ROOT).startsWith(NISRA_REGION);
   }
 }
