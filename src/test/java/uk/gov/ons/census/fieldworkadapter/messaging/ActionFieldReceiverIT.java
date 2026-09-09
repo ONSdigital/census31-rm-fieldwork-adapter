@@ -247,6 +247,12 @@ class ActionFieldReceiverIT {
 
   @Test
   void shouldSuppressCancelForCn80FieldFollowUpExclusions() {
+    // CN-80: CANCEL messages only exclude NISRA (N region) cases.
+    // Other CN-80 exclusion rules (invalid, refusal, HI case, treatment codes, Scotland)
+    // do NOT apply to CANCEL messages - they are still sent to fieldwork.
+
+    // These CANCEL messages should be SENT despite having CN-80 exclusion attributes,
+    // because they are not in NISRA (N region)
     EventDTO invalidCancel =
         buildEvent(
             FieldActionInstruction.CANCEL,
@@ -271,15 +277,31 @@ class ActionFieldReceiverIT {
             "E92000001",
             EventType.CASE_UPDATE,
             caseUpdate -> caseUpdate.setTreatmentCode("HH_ONE"));
-    EventDTO excludedScottishRegionCancel =
+    EventDTO scottishRegionCancel =
         buildEvent(FieldActionInstruction.CANCEL, "S92000003", EventType.CASE_UPDATE);
 
     underTest.receiveMessage(constructMessage(invalidCancel));
     underTest.receiveMessage(constructMessage(refusalCancel));
     underTest.receiveMessage(constructMessage(hiCaseCancel));
     underTest.receiveMessage(constructMessage(onlineOnlyCancel));
-    underTest.receiveMessage(constructMessage(excludedScottishRegionCancel));
+    underTest.receiveMessage(constructMessage(scottishRegionCancel));
 
+    // All 5 messages should be published (sent to fieldwork) because none are NISRA
+    verify(fieldworkActionPublisher, times(5)).sendMessage(any(), any(), any());
+  }
+
+  @Test
+  void shouldSuppressCancelForNisraRegionOnly() {
+    // CN-80: CANCEL messages with NISRA (N region) should be suppressed
+    EventDTO nisraCancel =
+        buildEvent(FieldActionInstruction.CANCEL, "N92000002", EventType.CASE_UPDATE);
+    EventDTO nisraCancelLowercase =
+        buildEvent(FieldActionInstruction.CANCEL, "n92000002", EventType.CASE_UPDATE);
+
+    underTest.receiveMessage(constructMessage(nisraCancel));
+    underTest.receiveMessage(constructMessage(nisraCancelLowercase));
+
+    // Neither NISRA CANCEL should be published
     verify(fieldworkActionPublisher, never()).sendMessage(any(), any(), any());
   }
 

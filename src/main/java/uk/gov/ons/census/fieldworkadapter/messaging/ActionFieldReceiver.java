@@ -185,7 +185,8 @@ public class ActionFieldReceiver {
     attributes.put(
         ATTR_CASE_ID, caseUpdate.getCaseId() == null ? EMPTY : caseUpdate.getCaseId().toString());
     attributes.put(
-        ATTR_EVENT_TYPE, header.getMessageType() == null ? EVENT_TYPE : header.getMessageType().name());
+        ATTR_EVENT_TYPE,
+        header.getMessageType() == null ? EVENT_TYPE : header.getMessageType().name());
     attributes.put(
         ATTR_SCHEMA_VERSION,
         header.getVersion() == null || header.getVersion().isBlank()
