@@ -3,8 +3,6 @@ package uk.gov.ons.census.fieldworkadapter.service;
 import java.util.Locale;
 import java.util.Optional;
 import java.util.Set;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
 import uk.gov.ons.census.fieldworkadapter.model.dto.CaseUpdateDTO;
 
@@ -12,7 +10,6 @@ import uk.gov.ons.census.fieldworkadapter.model.dto.CaseUpdateDTO;
 // Asymmetries: Receipt excludes only HH (not CE/SPG). Unknown region fails open (stays eligible).
 @Service
 public class FieldFollowUpFilter {
-  private static final Logger log = LoggerFactory.getLogger(FieldFollowUpFilter.class);
 
   public enum Exclusion {
     NULL_CASE,

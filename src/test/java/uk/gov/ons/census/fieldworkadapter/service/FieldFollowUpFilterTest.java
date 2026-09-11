@@ -72,7 +72,7 @@ class FieldFollowUpFilterTest {
   void shouldReturnFirstMatchingExclusion() {
     CaseUpdateDTO caseUpdate = eligibleCase();
     caseUpdate.setInvalid(true);
-    caseUpdate.setRefusalReceived(RefusalTypeDTO.SOFT_REFUSAL);
+    caseUpdate.setRefusalReceived(RefusalTypeDTO.EXTRAORDINARY_REFUSAL);
     caseUpdate.setReceiptReceived(true);
     caseUpdate.setCaseType("HI");
     caseUpdate.setTreatmentCode("HH_ONE");
