@@ -10,10 +10,10 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.core.retry.RetryListener;
 import org.springframework.integration.channel.DirectChannel;
 import org.springframework.integration.handler.advice.RequestHandlerRetryAdvice;
 import org.springframework.messaging.MessageChannel;
-import org.springframework.retry.RetryListener;
 import org.springframework.test.util.ReflectionTestUtils;
 import uk.gov.ons.census.fieldworkadapter.messaging.ManagedMessageRecoverer;
 

@@ -2,9 +2,8 @@ package uk.gov.ons.census.fieldworkadapter.utils;
 
 import static uk.gov.ons.census.fieldworkadapter.utils.Constants.ALLOWED_INBOUND_EVENT_SCHEMA_VERSIONS;
 
-import com.fasterxml.jackson.core.JsonProcessingException;
-import com.fasterxml.jackson.databind.ObjectMapper;
-import java.io.IOException;
+import tools.jackson.core.JacksonException;
+import tools.jackson.databind.ObjectMapper;
 import uk.gov.ons.census.fieldworkadapter.model.dto.EventDTO;
 
 public class JsonHelper {
@@ -13,7 +12,7 @@ public class JsonHelper {
   public static String convertObjectToJson(Object obj) {
     try {
       return objectMapper.writeValueAsString(obj);
-    } catch (JsonProcessingException e) {
+    } catch (JacksonException e) {
       throw new RuntimeException("Failed converting Object To Json", e);
     }
   }
@@ -22,7 +21,7 @@ public class JsonHelper {
     EventDTO event;
     try {
       event = objectMapper.readValue(bytes, EventDTO.class);
-    } catch (IOException e) {
+    } catch (JacksonException e) {
       throw new RuntimeException(e);
     }
 
