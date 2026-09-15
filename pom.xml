@@ -60,11 +60,6 @@
 
     <dependencyManagement>
         <dependencies>
-            <!--dependency>
-                <groupId>uk.gov.ons.census</groupId>
-                <artifactId>census-rm-common-entity-model</artifactId>
-                <version>${census-rm-common-entity-model.version}</version>
-            </dependency-->
             <dependency>
                 <groupId>org.springframework.cloud</groupId>
                 <artifactId>spring-cloud-dependencies</artifactId>
@@ -108,13 +103,6 @@
     </repositories>
 
     <dependencies>
-        <!-- TEMPORARY - remove once the upgrade is proven.
-             Logs every renamed/removed configuration property at startup. -->
-        <dependency>
-            <groupId>org.springframework.boot</groupId>
-            <artifactId>spring-boot-properties-migrator</artifactId>
-            <scope>runtime</scope>
-        </dependency>
         <dependency>
             <groupId>uk.gov.ons.census</groupId>
             <artifactId>census-rm-common-entity-model</artifactId>
@@ -136,11 +124,6 @@
             <groupId>com.google.cloud</groupId>
             <artifactId>spring-cloud-gcp-starter-pubsub</artifactId>
         </dependency>
-
-        <!-- Used by ExceptionManagerClient for outbound HTTP.
-             NOTE: if that class uses RestTemplateBuilder, it moved in Boot 4
-             to org.springframework.boot.restclient.RestTemplateBuilder and you
-             will need spring-boot-starter-restclient. See doc 08 Step 8. -->
         <dependency>
             <groupId>org.springframework</groupId>
             <artifactId>spring-web</artifactId>
@@ -149,10 +132,6 @@
             <groupId>jakarta.xml.bind</groupId>
             <artifactId>jakarta.xml.bind-api</artifactId>
         </dependency>
-        <!--dependency>
-            <groupId>org.apache.commons</groupId>
-            <artifactId>commons-lang3</artifactId>
-        </dependency-->
         <dependency>
             <groupId>org.projectlombok</groupId>
             <artifactId>lombok</artifactId>
