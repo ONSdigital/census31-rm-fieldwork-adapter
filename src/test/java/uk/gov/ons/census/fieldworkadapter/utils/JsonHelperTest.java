@@ -4,22 +4,32 @@ import static java.nio.charset.StandardCharsets.UTF_8;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 
+import java.time.OffsetDateTime;
 import java.util.UUID;
 import org.junit.jupiter.api.Test;
+import uk.gov.ons.census.common.model.entity.EventType;
 import uk.gov.ons.census.fieldworkadapter.model.dto.EventDTO;
 import uk.gov.ons.census.fieldworkadapter.model.dto.EventHeaderDTO;
+import uk.gov.ons.census.fieldworkadapter.model.dto.FieldActionInstruction;
 import uk.gov.ons.census.fieldworkadapter.model.dto.PayloadDTO;
 
 class JsonHelperTest {
 
   @Test
-  void convertObjectToJson_serializesEvent() {
+  void convertObjectToJson_serializesEventWithExpectedWireFormat() {
     EventDTO event = createEvent("0.5.0");
 
     String json = JsonHelper.convertObjectToJson(event);
 
-    assertThat(json).contains("\"version\":\"0.5.0\"");
-    assertThat(json).contains("\"topic\":\"test-topic\"");
+    assertThat(json)
+        .isEqualTo(
+            "{\"header\":{\"version\":\"0.5.0\",\"topic\":\"test-topic\","
+                + "\"source\":\"FIELDWORK_ADAPTER\",\"channel\":\"RM\","
+                + "\"dateTime\":\"2026-09-15T12:30:00Z\","
+                + "\"messageId\":\"11111111-1111-1111-1111-111111111111\","
+                + "\"correlationId\":\"22222222-2222-2222-2222-222222222222\","
+                + "\"originatingUser\":\"test-user\",\"messageType\":\"CASE_UPDATE\","
+                + "\"fieldActionInstruction\":\"CREATE\"},\"payload\":{}}");
   }
 
   @Test
@@ -58,9 +68,17 @@ class JsonHelperTest {
   }
 
   private EventDTO createEvent(String version) {
-    EventHeaderDTO header =
-        EventHelper.createEventDTO("test-topic", UUID.randomUUID(), "FIELDWORK_ADAPTER");
+    EventHeaderDTO header = new EventHeaderDTO();
     header.setVersion(version);
+    header.setTopic("test-topic");
+    header.setSource("FIELDWORK_ADAPTER");
+    header.setChannel("RM");
+    header.setDateTime(OffsetDateTime.parse("2026-09-15T12:30:00Z"));
+    header.setMessageId(UUID.fromString("11111111-1111-1111-1111-111111111111"));
+    header.setCorrelationId(UUID.fromString("22222222-2222-2222-2222-222222222222"));
+    header.setOriginatingUser("test-user");
+    header.setMessageType(EventType.CASE_UPDATE);
+    header.setFieldActionInstruction(FieldActionInstruction.CREATE);
 
     EventDTO event = new EventDTO();
     event.setHeader(header);

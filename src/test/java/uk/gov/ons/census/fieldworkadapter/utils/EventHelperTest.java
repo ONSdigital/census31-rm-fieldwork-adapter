@@ -13,7 +13,7 @@ import uk.gov.ons.census.fieldworkadapter.model.dto.EventHeaderDTO;
 public class EventHelperTest {
 
   @Test
-  public void testCreateEventDTOWithEventType() {
+  public void testCreateEventDTOWithDefaultChannelAndSource() {
     EventHeaderDTO eventHeader =
         EventHelper.createEventDTO("TOPIC", TEST_CORRELATION_ID, TEST_ORIGINATING_USER);
 
@@ -28,7 +28,7 @@ public class EventHelperTest {
   }
 
   @Test
-  public void testCreateEventDTOWithEventTypeChannelAndSource() {
+  public void testCreateEventDTOWithCustomChannelAndSource() {
     EventHeaderDTO eventHeader =
         EventHelper.createEventDTO(
             "TOPIC", "CHANNEL", "SOURCE", TEST_CORRELATION_ID, TEST_ORIGINATING_USER, null);
