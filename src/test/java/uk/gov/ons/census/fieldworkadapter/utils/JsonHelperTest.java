@@ -3,6 +3,8 @@ package uk.gov.ons.census.fieldworkadapter.utils;
 import static java.nio.charset.StandardCharsets.UTF_8;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertThrows;
+import static uk.gov.ons.census.fieldworkadapter.utils.Constants.ALLOWED_INBOUND_EVENT_SCHEMA_VERSIONS;
+import static uk.gov.ons.census.fieldworkadapter.utils.Constants.OUTBOUND_EVENT_SCHEMA_VERSION;
 
 import java.time.OffsetDateTime;
 import java.util.UUID;
@@ -17,13 +19,15 @@ class JsonHelperTest {
 
   @Test
   void convertObjectToJson_serializesEventWithExpectedWireFormat() {
-    EventDTO event = createEvent("0.5.0");
+    EventDTO event = createEvent(OUTBOUND_EVENT_SCHEMA_VERSION);
 
     String json = JsonHelper.convertObjectToJson(event);
 
     assertThat(json)
         .isEqualTo(
-            "{\"header\":{\"version\":\"0.5.0\",\"topic\":\"test-topic\","
+            "{\"header\":{\"version\":\""
+                + OUTBOUND_EVENT_SCHEMA_VERSION
+                + "\",\"topic\":\"test-topic\","
                 + "\"source\":\"FIELDWORK_ADAPTER\",\"channel\":\"RM\","
                 + "\"dateTime\":\"2026-09-15T12:30:00Z\","
                 + "\"messageId\":\"11111111-1111-1111-1111-111111111111\","
@@ -34,12 +38,12 @@ class JsonHelperTest {
 
   @Test
   void convertJsonBytesToEvent_deserializesSupportedVersion() {
-    EventDTO event = createEvent("0.5.0");
+    EventDTO event = createEvent(OUTBOUND_EVENT_SCHEMA_VERSION);
 
     EventDTO converted =
         JsonHelper.convertJsonBytesToEvent(JsonHelper.convertObjectToJson(event).getBytes(UTF_8));
 
-    assertThat(converted.getHeader().getVersion()).isEqualTo("0.5.0");
+    assertThat(converted.getHeader().getVersion()).isEqualTo(OUTBOUND_EVENT_SCHEMA_VERSION);
     assertThat(converted.getHeader().getTopic()).isEqualTo("test-topic");
   }
 
@@ -56,6 +60,7 @@ class JsonHelperTest {
 
     assertThat(ex.getMessage()).contains("Unsupported message version");
     assertThat(ex.getMessage()).contains("0.1.0");
+    assertThat(ex.getMessage()).contains(String.join(", ", ALLOWED_INBOUND_EVENT_SCHEMA_VERSIONS));
   }
 
   @Test
