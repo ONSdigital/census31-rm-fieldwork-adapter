@@ -12,12 +12,11 @@ spring:
       - org.springframework.boot.data.jpa.autoconfigure.DataJpaRepositoriesAutoConfiguration
       - org.springframework.boot.flyway.autoconfigure.FlywayAutoConfiguration
 
-  spring:
-    jackson:
-      # Boot 4 migration: freeze Spring's own mapper at Jackson 2 behaviour so
-      # this release changes no contract. REMOVE in H2 2027 as its own
-      # announced change, estate-wide.
-      use-jackson2-defaults: true
+  jackson:
+    # Boot 4 migration: freeze Spring's own mapper at Jackson 2 behaviour so
+    # this release changes no contract. REMOVE in H2 2027 as its own
+    # announced change, estate-wide.
+    use-jackson2-defaults: true
 
   cloud:
     gcp:
