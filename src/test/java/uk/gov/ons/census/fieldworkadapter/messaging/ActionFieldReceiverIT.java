@@ -13,6 +13,7 @@ import static uk.gov.ons.census.fieldworkadapter.utils.Constants.OUTBOUND_EVENT_
 import java.time.OffsetDateTime;
 import java.util.Map;
 import java.util.UUID;
+import java.util.function.Consumer;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -34,6 +35,8 @@ import uk.gov.ons.census.fieldworkadapter.model.dto.FieldActionInstruction;
 import uk.gov.ons.census.fieldworkadapter.model.dto.FwmtActionInstructionDTO;
 import uk.gov.ons.census.fieldworkadapter.model.dto.FwmtCancelActionInstructionDTO;
 import uk.gov.ons.census.fieldworkadapter.model.dto.PayloadDTO;
+import uk.gov.ons.census.fieldworkadapter.model.dto.RefusalTypeDTO;
+import uk.gov.ons.census.fieldworkadapter.service.FieldFollowUpFilter;
 import uk.gov.ons.census.fieldworkadapter.utils.ActionInstructionMapper;
 import uk.gov.ons.census.fieldworkadapter.utils.JsonHelper;
 
@@ -42,6 +45,7 @@ import uk.gov.ons.census.fieldworkadapter.utils.JsonHelper;
     classes = {
       ActionFieldReceiver.class,
       ActionInstructionMapper.class,
+      FieldFollowUpFilter.class,
       ActionFieldReceiverIT.TestConfig.class
     })
 @TestPropertySource(
@@ -211,8 +215,6 @@ class ActionFieldReceiverIT {
 
   @Test
   void shouldSuppressNisraMessages() {
-    // Owns "N" region across all instruction types — format variants are owned by the contract
-    // test.
     EventDTO createEvent = buildEvent(FieldActionInstruction.CREATE, "N", EventType.CASE_UPDATE);
     EventDTO updateEvent = buildEvent(FieldActionInstruction.UPDATE, "N", EventType.CASE_UPDATE);
     EventDTO cancelEvent = buildEvent(FieldActionInstruction.CANCEL, "N", EventType.CASE_UPDATE);
@@ -226,8 +228,6 @@ class ActionFieldReceiverIT {
 
   @Test
   void shouldSuppressKnownNiRegionContractSamples() {
-    // "N" across all instructions is owned by shouldSuppressNisraMessagesThroughSpringWiring;
-    // this test focuses purely on region format detection: case-insensitive, prefix, and trim.
     EventDTO niLowerCaseRegionOnly =
         buildEvent(FieldActionInstruction.CREATE, "n", EventType.CASE_UPDATE);
     EventDTO niOnsCode =
@@ -246,18 +246,77 @@ class ActionFieldReceiverIT {
   }
 
   @Test
+  void shouldSuppressCancelForCn80FieldFollowUpExclusions() {
+    // CN-80: CANCEL messages only exclude NISRA (N region) cases.
+    // Other CN-80 exclusion rules (invalid, refusal, HI case, treatment codes, Scotland)
+    // do NOT apply to CANCEL messages - they are still sent to fieldwork.
+
+    // These CANCEL messages should be SENT despite having CN-80 exclusion attributes,
+    // because they are not in NISRA (N region)
+    EventDTO invalidCancel =
+        buildEvent(
+            FieldActionInstruction.CANCEL,
+            "E92000001",
+            EventType.CASE_UPDATE,
+            caseUpdate -> caseUpdate.setInvalid(true));
+    EventDTO refusalCancel =
+        buildEvent(
+            FieldActionInstruction.CANCEL,
+            "E92000001",
+            EventType.CASE_UPDATE,
+            caseUpdate -> caseUpdate.setRefusalReceived(RefusalTypeDTO.HARD_REFUSAL));
+    EventDTO hiCaseCancel =
+        buildEvent(
+            FieldActionInstruction.CANCEL,
+            "E92000001",
+            EventType.CASE_UPDATE,
+            caseUpdate -> caseUpdate.setCaseType("HI"));
+    EventDTO onlineOnlyCancel =
+        buildEvent(
+            FieldActionInstruction.CANCEL,
+            "E92000001",
+            EventType.CASE_UPDATE,
+            caseUpdate -> caseUpdate.setTreatmentCode("HH_ONE"));
+    EventDTO scottishRegionCancel =
+        buildEvent(FieldActionInstruction.CANCEL, "S92000003", EventType.CASE_UPDATE);
+
+    underTest.receiveMessage(constructMessage(invalidCancel));
+    underTest.receiveMessage(constructMessage(refusalCancel));
+    underTest.receiveMessage(constructMessage(hiCaseCancel));
+    underTest.receiveMessage(constructMessage(onlineOnlyCancel));
+    underTest.receiveMessage(constructMessage(scottishRegionCancel));
+
+    // All 5 messages should be published (sent to fieldwork) because none are NISRA
+    verify(fieldworkActionPublisher, times(5)).sendMessage(any(), any(), any());
+  }
+
+  @Test
+  void shouldSuppressCancelForNisraRegionOnly() {
+    // CN-80: CANCEL messages with NISRA (N region) should be suppressed
+    EventDTO nisraCancel =
+        buildEvent(FieldActionInstruction.CANCEL, "N92000002", EventType.CASE_UPDATE);
+    EventDTO nisraCancelLowercase =
+        buildEvent(FieldActionInstruction.CANCEL, "n92000002", EventType.CASE_UPDATE);
+
+    underTest.receiveMessage(constructMessage(nisraCancel));
+    underTest.receiveMessage(constructMessage(nisraCancelLowercase));
+
+    // Neither NISRA CANCEL should be published
+    verify(fieldworkActionPublisher, never()).sendMessage(any(), any(), any());
+  }
+
+  @Test
   void shouldPublishForNonNiRegionContractControls() {
-    // Verifies non-NI region codes publish through Spring wiring across all instruction types.
     EventDTO englandCreate =
         buildEvent(FieldActionInstruction.CREATE, "E92000001", EventType.CASE_UPDATE);
     EventDTO walesUpdate =
         buildEvent(FieldActionInstruction.UPDATE, "W92000004", EventType.CASE_UPDATE);
-    EventDTO scotlandCancel =
-        buildEvent(FieldActionInstruction.CANCEL, "S92000003", EventType.CASE_UPDATE);
+    EventDTO englandCancel =
+        buildEvent(FieldActionInstruction.CANCEL, "E12000004", EventType.CASE_UPDATE);
 
     underTest.receiveMessage(constructMessage(englandCreate));
     underTest.receiveMessage(constructMessage(walesUpdate));
-    underTest.receiveMessage(constructMessage(scotlandCancel));
+    underTest.receiveMessage(constructMessage(englandCancel));
 
     verify(fieldworkActionPublisher, times(3)).sendMessage(eq(TEST_TOPIC), any(), any());
   }
@@ -282,8 +341,27 @@ class ActionFieldReceiverIT {
       FieldActionInstruction instruction,
       String region,
       EventType messageType,
+      Consumer<CaseUpdateDTO> caseUpdateMutator) {
+    return buildEvent(instruction, region, messageType, "HH", "U", caseUpdateMutator);
+  }
+
+  private EventDTO buildEvent(
+      FieldActionInstruction instruction,
+      String region,
+      EventType messageType,
       String addressType,
       String addressLevel) {
+    return buildEvent(
+        instruction, region, messageType, addressType, addressLevel, caseUpdate -> {});
+  }
+
+  private EventDTO buildEvent(
+      FieldActionInstruction instruction,
+      String region,
+      EventType messageType,
+      String addressType,
+      String addressLevel,
+      Consumer<CaseUpdateDTO> caseUpdateMutator) {
     EventHeaderDTO header = new EventHeaderDTO();
     header.setVersion(OUTBOUND_EVENT_SCHEMA_VERSION);
     header.setMessageType(messageType);
@@ -311,6 +389,7 @@ class ActionFieldReceiverIT {
     CaseUpdateDTO caseUpdate = new CaseUpdateDTO();
     caseUpdate.setCaseId(UUID.randomUUID());
     caseUpdate.setCaseRef("1000000001");
+    caseUpdate.setCaseType("HH");
     caseUpdate.setFieldOfficerId("FO12345");
     caseUpdate.setFieldCoordinatorId("FC001");
     caseUpdate.setOa("E00000001");
@@ -320,6 +399,7 @@ class ActionFieldReceiverIT {
     caseUpdate.setBlankFormReturned(false);
     caseUpdate.setSecureEstablishment(false);
     caseUpdate.setAddress(address);
+    caseUpdateMutator.accept(caseUpdate);
 
     PayloadDTO payload = new PayloadDTO();
     payload.setCaseUpdate(caseUpdate);
