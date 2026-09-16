@@ -64,9 +64,6 @@ public class FieldFollowUpFilter {
     }
 
     String region = normalise(caseUpdate.getAddress().getRegion());
-    if (region == null) {
-      return false; // fail-open: whitespace-only region stays eligible
-    }
 
     return EXCLUDED_REGION_PREFIXES.stream().anyMatch(region::startsWith);
   }
