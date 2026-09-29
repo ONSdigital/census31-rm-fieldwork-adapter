@@ -1,5 +1,7 @@
 package uk.gov.ons.census.fieldworkadapter.utils;
 
+import static uk.gov.ons.census.fieldworkadapter.utils.Constants.SURVEY_NAME;
+
 import org.springframework.stereotype.Component;
 import uk.gov.ons.census.fieldworkadapter.model.dto.CaseUpdateDTO;
 import uk.gov.ons.census.fieldworkadapter.model.dto.FieldActionInstruction;
@@ -9,7 +11,6 @@ import uk.gov.ons.census.fieldworkadapter.model.dto.FwmtCancelActionInstructionD
 @Component
 public class ActionInstructionMapper {
 
-  private static final String SURVEY_NAME = "Census";
   private static final String CE_ADDRESS_TYPE = "CE";
   private static final String CE_UNIT_ADDRESS_LEVEL = "U";
 

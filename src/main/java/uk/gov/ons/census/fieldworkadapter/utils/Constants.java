@@ -7,4 +7,5 @@ public class Constants {
   public static final Set<String> ALLOWED_INBOUND_EVENT_SCHEMA_VERSIONS = Set.of("1.0.0");
 
   public static final String REQUEST_PERSONALISATION_PREFIX = "__request__.";
+  public static final String SURVEY_NAME = "CENSUS";
 }

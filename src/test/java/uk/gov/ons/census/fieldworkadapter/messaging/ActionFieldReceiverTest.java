@@ -33,6 +33,7 @@ import uk.gov.ons.census.fieldworkadapter.model.dto.FwmtCancelActionInstructionD
 import uk.gov.ons.census.fieldworkadapter.model.dto.PayloadDTO;
 import uk.gov.ons.census.fieldworkadapter.service.FieldFollowUpFilter;
 import uk.gov.ons.census.fieldworkadapter.utils.ActionInstructionMapper;
+import uk.gov.ons.census.fieldworkadapter.utils.Constants;
 
 @ExtendWith(MockitoExtension.class)
 class ActionFieldReceiverTest {
@@ -73,7 +74,7 @@ class ActionFieldReceiverTest {
 
     FwmtActionInstructionDTO published = (FwmtActionInstructionDTO) publishedMessage.payload();
     assertThat(published.getActionInstruction()).isEqualTo(FieldActionInstruction.CREATE);
-    assertThat(published.getSurveyName()).isEqualTo("Census");
+    assertThat(published.getSurveyName()).isEqualTo(Constants.SURVEY_NAME);
     assertThat(published.getCaseId()).isEqualTo(event.getPayload().getCaseUpdate().getCaseId());
     assertThat(published.getAddressType()).isEqualTo("HH");
     assertThat(published.getCaseRef()).isEqualTo("1000000001");
@@ -93,7 +94,7 @@ class ActionFieldReceiverTest {
 
     FwmtActionInstructionDTO published = (FwmtActionInstructionDTO) publishedMessage.payload();
     assertThat(published.getActionInstruction()).isEqualTo(FieldActionInstruction.UPDATE);
-    assertThat(published.getSurveyName()).isEqualTo("Census");
+    assertThat(published.getSurveyName()).isEqualTo(Constants.SURVEY_NAME);
     assertThat(published.getCaseId()).isEqualTo(event.getPayload().getCaseUpdate().getCaseId());
     assertThat(published.getAddressType()).isEqualTo("HH");
     assertThat(published.getCaseRef()).isEqualTo("1000000001");
@@ -114,7 +115,7 @@ class ActionFieldReceiverTest {
     FwmtCancelActionInstructionDTO published =
         (FwmtCancelActionInstructionDTO) publishedMessage.payload();
     assertThat(published.getActionInstruction()).isEqualTo(FieldActionInstruction.CANCEL);
-    assertThat(published.getSurveyName()).isEqualTo("Census");
+    assertThat(published.getSurveyName()).isEqualTo(Constants.SURVEY_NAME);
     assertThat(published.getCaseId()).isEqualTo(event.getPayload().getCaseUpdate().getCaseId());
     assertThat(published.getAddressType()).isEqualTo("HH");
     assertThat(published.getAddressLevel()).isNull();
