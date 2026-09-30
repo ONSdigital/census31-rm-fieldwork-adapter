@@ -66,8 +66,7 @@ public class FieldFollowUpFilter {
 
   // CREATE/UPDATE-specific rules: NOT applied to CANCEL messages.
   // These represent case status transitions that trigger CANCEL creation.
-  private Optional<Exclusion> checkCreateUpdateSpecificExclusions(
-      CaseUpdateDTO caseUpdate) {
+  private Optional<Exclusion> checkCreateUpdateSpecificExclusions(CaseUpdateDTO caseUpdate) {
     if (caseUpdate.isInvalid()) {
       return Optional.of(Exclusion.INVALID);
     }

@@ -134,7 +134,6 @@ class ActionFieldReceiverTest {
     verify(fieldworkActionPublisher, never()).sendMessage(anyString(), any(), anyMap());
   }
 
-
   @Test
   void shouldSuppressCancelForExcludedRegions() {
     // CN-220: CANCEL messages for N (NISRA) and S (Scotland) regions should be suppressed
