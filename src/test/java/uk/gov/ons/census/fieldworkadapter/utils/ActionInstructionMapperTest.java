@@ -22,7 +22,7 @@ class ActionInstructionMapperTest {
     String json = JsonHelper.convertObjectToJson(mapped);
 
     assertThat(mapped.getActionInstruction()).isEqualTo(FieldActionInstruction.CREATE);
-    assertThat(mapped.getSurveyName()).isEqualTo("Census");
+    assertThat(mapped.getSurveyName()).isEqualTo(Constants.SURVEY_NAME);
     assertThat(mapped.getCaseId()).isEqualTo(caseUpdate.getCaseId());
     assertThat(mapped.getCaseRef()).isEqualTo(caseUpdate.getCaseRef());
     assertThat(mapped.getAddressType()).isEqualTo("HH");
@@ -50,7 +50,7 @@ class ActionInstructionMapperTest {
     String json = JsonHelper.convertObjectToJson(mapped);
 
     assertThat(mapped.getActionInstruction()).isEqualTo(FieldActionInstruction.CREATE);
-    assertThat(mapped.getSurveyName()).isEqualTo("Census");
+    assertThat(mapped.getSurveyName()).isEqualTo(Constants.SURVEY_NAME);
     assertThat(mapped.getCaseId()).isEqualTo(caseUpdate.getCaseId());
     assertThat(mapped.getAddressType()).isEqualTo("CE");
     assertThat(mapped.getAddressLevel()).isEqualTo("U");
@@ -83,7 +83,7 @@ class ActionInstructionMapperTest {
     String json = JsonHelper.convertObjectToJson(mapped);
 
     assertThat(mapped.getActionInstruction()).isEqualTo(FieldActionInstruction.UPDATE);
-    assertThat(mapped.getSurveyName()).isEqualTo("Census");
+    assertThat(mapped.getSurveyName()).isEqualTo(Constants.SURVEY_NAME);
     assertThat(mapped.getCaseId()).isEqualTo(caseUpdate.getCaseId());
     assertThat(mapped.getAddressType()).isEqualTo("CE");
     assertThat(mapped.getAddressLevel()).isEqualTo("E");
@@ -113,7 +113,7 @@ class ActionInstructionMapperTest {
     String json = JsonHelper.convertObjectToJson(mapped);
 
     assertThat(mapped.getActionInstruction()).isEqualTo(FieldActionInstruction.CANCEL);
-    assertThat(mapped.getSurveyName()).isEqualTo("Census");
+    assertThat(mapped.getSurveyName()).isEqualTo(Constants.SURVEY_NAME);
     assertThat(mapped.getCaseId()).isEqualTo(caseUpdate.getCaseId());
     assertThat(mapped.getAddressType()).isEqualTo("HH");
     assertThat(mapped.getAddressLevel()).isNull();
@@ -128,7 +128,7 @@ class ActionInstructionMapperTest {
     String json = JsonHelper.convertObjectToJson(mapped);
 
     assertThat(mapped.getActionInstruction()).isEqualTo(FieldActionInstruction.CANCEL);
-    assertThat(mapped.getSurveyName()).isEqualTo("Census");
+    assertThat(mapped.getSurveyName()).isEqualTo(Constants.SURVEY_NAME);
     assertThat(mapped.getCaseId()).isEqualTo(caseUpdate.getCaseId());
     assertThat(mapped.getAddressType()).isEqualTo("CE");
     assertThat(mapped.getAddressLevel()).isEqualTo("U");
