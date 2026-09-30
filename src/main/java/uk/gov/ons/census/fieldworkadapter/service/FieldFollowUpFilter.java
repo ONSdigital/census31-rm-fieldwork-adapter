@@ -6,8 +6,7 @@ import java.util.Set;
 import org.springframework.stereotype.Service;
 import uk.gov.ons.census.fieldworkadapter.model.dto.CaseUpdateDTO;
 
-// CN-80: Field follow-up eligibility filter. Rules evaluated in order; first match returned.
-// Asymmetries: Receipt excludes only HH (not CE/SPG). Unknown region fails open (stays eligible).
+// Field follow-up eligibility filter. Rules evaluated in priority order; first match returned.
 @Service
 public class FieldFollowUpFilter {
 
@@ -31,17 +30,28 @@ public class FieldFollowUpFilter {
       return Optional.of(Exclusion.NULL_CASE);
     }
 
+    return checkCreateUpdateSpecificExclusions(caseUpdate)
+        .or(() -> checkCommonExclusions(caseUpdate));
+  }
+
+  public boolean isValidForFieldFollowUp(CaseUpdateDTO caseUpdate) {
+    return exclusionFor(caseUpdate).isEmpty();
+  }
+
+  // CANCEL messages only check common rules (case type, region, treatment).
+  // They do NOT check case status (invalid, refused, receipt) because these status
+  // transitions are the TRIGGERS for sending CANCEL, not reasons to suppress it.
+  public Optional<Exclusion> exclusionForCancelInstruction(CaseUpdateDTO caseUpdate) {
+    return checkCommonExclusions(caseUpdate);
+  }
+
+  private Optional<Exclusion> checkCommonExclusions(CaseUpdateDTO caseUpdate) {
+    if (caseUpdate == null) {
+      return Optional.of(Exclusion.NULL_CASE);
+    }
+
     String caseType = normalise(caseUpdate.getCaseType());
 
-    if (caseUpdate.isInvalid()) {
-      return Optional.of(Exclusion.INVALID);
-    }
-    if (caseUpdate.getRefusalReceived() != null) {
-      return Optional.of(Exclusion.REFUSED);
-    }
-    if (CASE_TYPE_HH.equals(caseType) && caseUpdate.isReceiptReceived()) {
-      return Optional.of(Exclusion.HH_ALREADY_RECEIPTED);
-    }
     if (CASE_TYPE_HI.equals(caseType)) {
       return Optional.of(Exclusion.HI_CASE_TYPE);
     }
@@ -54,8 +64,22 @@ public class FieldFollowUpFilter {
     return Optional.empty();
   }
 
-  public boolean isValidForFieldFollowUp(CaseUpdateDTO caseUpdate) {
-    return exclusionFor(caseUpdate).isEmpty();
+  // CREATE/UPDATE-specific rules: NOT applied to CANCEL messages.
+  // These represent case status transitions that trigger CANCEL creation.
+  private Optional<Exclusion> checkCreateUpdateSpecificExclusions(
+      CaseUpdateDTO caseUpdate) {
+    if (caseUpdate.isInvalid()) {
+      return Optional.of(Exclusion.INVALID);
+    }
+    if (caseUpdate.getRefusalReceived() != null) {
+      return Optional.of(Exclusion.REFUSED);
+    }
+    // Receipt exclusion applies only to HH cases (not CE/SPG)
+    if (CASE_TYPE_HH.equals(normalise(caseUpdate.getCaseType()))
+        && caseUpdate.isReceiptReceived()) {
+      return Optional.of(Exclusion.HH_ALREADY_RECEIPTED);
+    }
+    return Optional.empty();
   }
 
   private boolean isExcludedRegion(CaseUpdateDTO caseUpdate) {
@@ -64,7 +88,6 @@ public class FieldFollowUpFilter {
     }
 
     String region = normalise(caseUpdate.getAddress().getRegion());
-
     return EXCLUDED_REGION_PREFIXES.stream().anyMatch(region::startsWith);
   }
 

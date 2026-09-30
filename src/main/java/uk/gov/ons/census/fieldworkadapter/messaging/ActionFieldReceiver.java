@@ -5,7 +5,6 @@ import static uk.gov.ons.census.fieldworkadapter.utils.JsonHelper.convertJsonByt
 import com.google.cloud.spring.pubsub.support.BasicAcknowledgeablePubsubMessage;
 import com.google.cloud.spring.pubsub.support.GcpPubSubHeaders;
 import java.util.LinkedHashMap;
-import java.util.Locale;
 import java.util.Map;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -36,12 +35,8 @@ public class ActionFieldReceiver {
   private static final String OUTCOME_IGNORED_NO_INSTRUCTION = "IGNORED_NO_INSTRUCTION";
   private static final String OUTCOME_PUBLISHED = "PUBLISHED";
   private static final String OUTCOME_PUBLISH_FAILED = "PUBLISH_FAILED";
-  private static final String OUTCOME_SUPPRESSED_NISRA = "SUPPRESSED_NISRA";
   private static final String OUTCOME_SUPPRESSED_INVALID_FOR_FIELD_FOLLOWUP =
       "SUPPRESSED_INVALID_FOR_FIELD_FOLLOWUP";
-
-  // NISRA region constants
-  private static final String NISRA_REGION = "N";
 
   // Attribute key constants
   private static final String ATTR_EVENT_ID = "eventId";
@@ -97,8 +92,13 @@ public class ActionFieldReceiver {
 
   private void handleCancelInstruction(
       EventDTO event, Message<byte[]> message, CaseUpdateDTO caseUpdate) {
-    if (isNisraCase(caseUpdate)) {
-      logOutcome(OUTCOME_SUPPRESSED_NISRA, caseUpdate, FieldActionInstruction.CANCEL, null);
+    var exclusion = fieldFollowUpFilter.exclusionForCancelInstruction(caseUpdate);
+    if (exclusion.isPresent()) {
+      logOutcome(
+          OUTCOME_SUPPRESSED_INVALID_FOR_FIELD_FOLLOWUP,
+          caseUpdate,
+          FieldActionInstruction.CANCEL,
+          exclusion.get());
       return;
     }
 
@@ -114,19 +114,6 @@ public class ActionFieldReceiver {
       logOutcome(OUTCOME_PUBLISH_FAILED, caseUpdate, FieldActionInstruction.CANCEL, null);
       throw ex;
     }
-  }
-
-  /**
-   * Returns {@code true} if the case is a NISRA case (region begins with "N", case-insensitive).
-   * NISRA cases must be excluded from fieldwork for the 2027 test.
-   */
-  private boolean isNisraCase(CaseUpdateDTO caseUpdate) {
-    if (caseUpdate.getAddress() == null || caseUpdate.getAddress().getRegion() == null) {
-      return false;
-    }
-
-    String region = caseUpdate.getAddress().getRegion().trim();
-    return !region.isEmpty() && region.toUpperCase(Locale.ROOT).startsWith(NISRA_REGION);
   }
 
   private void handleForwardableInstruction(
