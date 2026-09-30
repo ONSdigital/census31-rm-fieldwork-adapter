@@ -14,7 +14,6 @@
 
         <census-rm-common-entity-model.version>1.0.2-SNAPSHOT</census-rm-common-entity-model.version>
         <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
-        <container.cli>docker</container.cli>
 
         <!-- BOM / dependency management versions -->
         <spring-cloud.version>2025.1.3</spring-cloud.version>
@@ -26,30 +25,11 @@
         <!-- Plugin and extension versions -->
         <maven-pmd-plugin.version>3.28.0</maven-pmd-plugin.version>
         <pmd.version>7.26.0</pmd.version>
-        <exec-maven-plugin.version>3.6.3</exec-maven-plugin.version>
         <spotless-maven-plugin.version>3.10.0</spotless-maven-plugin.version>
         <google-java-format.version>1.36.1</google-java-format.version>
         <jacoco-maven-plugin.version>0.8.15</jacoco-maven-plugin.version>
         <artifactregistry-maven-wagon.version>2.2.5</artifactregistry-maven-wagon.version>
-        <skip.docker.compose>true</skip.docker.compose>
     </properties>
-
-    <profiles>
-        <!-- Podman profile activated when env CONTAINER_CLI is set to "podman" -->
-        <!-- This is so podman will be used to run docker commands -->
-        <profile>
-            <id>podman</id>
-            <activation>
-                <property>
-                    <name>env.CONTAINER_CLI</name>
-                    <value>podman</value>
-                </property>
-            </activation>
-            <properties>
-                <container.cli>podman</container.cli>
-            </properties>
-        </profile>
-    </profiles>
 
     <parent>
         <groupId>org.springframework.boot</groupId>
@@ -216,37 +196,6 @@
                             <goal>verify</goal>
                         </goals>
                         <phase>integration-test</phase>
-                    </execution>
-                </executions>
-            </plugin>
-            <plugin>
-                <groupId>org.codehaus.mojo</groupId>
-                <artifactId>exec-maven-plugin</artifactId>
-                <version>${exec-maven-plugin.version}</version>
-                <executions>
-                    <execution>
-                        <id>Docker Compose Up</id>
-                        <phase>pre-integration-test</phase>
-                        <goals>
-                            <goal>exec</goal>
-                        </goals>
-                        <configuration>
-                            <skip>${skip.docker.compose}</skip>
-                            <executable>${container.cli}</executable>
-                            <commandlineArgs>compose -f src/test/resources/docker-compose.yml up -d</commandlineArgs>
-                        </configuration>
-                    </execution>
-                    <execution>
-                        <id>Docker Compose Down</id>
-                        <phase>post-integration-test</phase>
-                        <goals>
-                            <goal>exec</goal>
-                        </goals>
-                        <configuration>
-                            <skip>${skip.docker.compose}</skip>
-                            <executable>${container.cli}</executable>
-                            <commandlineArgs>compose -f src/test/resources/docker-compose.yml down -v</commandlineArgs>
-                        </configuration>
                     </execution>
                 </executions>
             </plugin>
