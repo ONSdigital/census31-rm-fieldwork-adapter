@@ -247,13 +247,18 @@ class ActionFieldReceiverIT {
   }
 
   @Test
-  void shouldSuppressCancelForCn80FieldFollowUpExclusions() {
-    // CN-80: CANCEL messages only exclude NISRA (N region) cases.
-    // Other CN-80 exclusion rules (invalid, refusal, HI case, treatment codes, Scotland)
-    // do NOT apply to CANCEL messages - they are still sent to fieldwork.
+  void shouldSuppressCancelForCn220Exclusions() {
+    // CN-220: CANCEL messages should be suppressed for:
+    // - HI case type
+    // - Excluded regions (N, S)
+    // - Online-only treatments (HH_ONE, HH_ONW)
+    //
+    // CANCEL messages should NOT be suppressed for:
+    // - Invalid status (these are reasons for CANCEL)
+    // - Refusal status (these are reasons for CANCEL)
+    // - HH receipt status (these are reasons for CANCEL)
 
-    // These CANCEL messages should be SENT despite having CN-80 exclusion attributes,
-    // because they are not in NISRA (N region)
+    // These should be SENT to fieldwork (not excluded by CN-220 rules)
     EventDTO invalidCancel =
         buildEvent(
             FieldActionInstruction.CANCEL,
@@ -266,34 +271,68 @@ class ActionFieldReceiverIT {
             "E92000001",
             EventType.CASE_UPDATE,
             caseUpdate -> caseUpdate.setRefusalReceived(RefusalTypeDTO.HARD_REFUSAL));
+
+    underTest.receiveMessage(constructMessage(invalidCancel));
+    underTest.receiveMessage(constructMessage(refusalCancel));
+
+    verify(fieldworkActionPublisher, times(2)).sendMessage(any(), any(), any());
+  }
+
+  @Test
+  void shouldSuppressCancelForHiCaseType() {
     EventDTO hiCaseCancel =
         buildEvent(
             FieldActionInstruction.CANCEL,
             "E92000001",
             EventType.CASE_UPDATE,
             caseUpdate -> caseUpdate.setCaseType("HI"));
+
+    underTest.receiveMessage(constructMessage(hiCaseCancel));
+
+    verify(fieldworkActionPublisher, never()).sendMessage(any(), any(), any());
+  }
+
+  @Test
+  void shouldSuppressCancelForScottishRegion() {
+    EventDTO scottishCancel =
+        buildEvent(FieldActionInstruction.CANCEL, "S92000003", EventType.CASE_UPDATE);
+
+    underTest.receiveMessage(constructMessage(scottishCancel));
+
+    verify(fieldworkActionPublisher, never()).sendMessage(any(), any(), any());
+  }
+
+  @Test
+  void shouldSuppressCancelForHhOneTreatment() {
     EventDTO onlineOnlyCancel =
         buildEvent(
             FieldActionInstruction.CANCEL,
             "E92000001",
             EventType.CASE_UPDATE,
             caseUpdate -> caseUpdate.setTreatmentCode("HH_ONE"));
-    EventDTO scottishRegionCancel =
-        buildEvent(FieldActionInstruction.CANCEL, "S92000003", EventType.CASE_UPDATE);
 
-    underTest.receiveMessage(constructMessage(invalidCancel));
-    underTest.receiveMessage(constructMessage(refusalCancel));
-    underTest.receiveMessage(constructMessage(hiCaseCancel));
     underTest.receiveMessage(constructMessage(onlineOnlyCancel));
-    underTest.receiveMessage(constructMessage(scottishRegionCancel));
 
-    // All 5 messages should be published (sent to fieldwork) because none are NISRA
-    verify(fieldworkActionPublisher, times(5)).sendMessage(any(), any(), any());
+    verify(fieldworkActionPublisher, never()).sendMessage(any(), any(), any());
   }
 
   @Test
-  void shouldSuppressCancelForNisraRegionOnly() {
-    // CN-80: CANCEL messages with NISRA (N region) should be suppressed
+  void shouldSuppressCancelForHhOnwTreatment() {
+    EventDTO onlineOnlyCancel =
+        buildEvent(
+            FieldActionInstruction.CANCEL,
+            "E92000001",
+            EventType.CASE_UPDATE,
+            caseUpdate -> caseUpdate.setTreatmentCode("HH_ONW"));
+
+    underTest.receiveMessage(constructMessage(onlineOnlyCancel));
+
+    verify(fieldworkActionPublisher, never()).sendMessage(any(), any(), any());
+  }
+
+  @Test
+  void shouldSuppressCancelForNisraRegion() {
+    // CN-80/CN-220: CANCEL messages with NISRA (N region) should be suppressed
     EventDTO nisraCancel =
         buildEvent(FieldActionInstruction.CANCEL, "N92000002", EventType.CASE_UPDATE);
     EventDTO nisraCancelLowercase =
@@ -304,6 +343,17 @@ class ActionFieldReceiverIT {
 
     // Neither NISRA CANCEL should be published
     verify(fieldworkActionPublisher, never()).sendMessage(any(), any(), any());
+  }
+
+  @Test
+  void shouldPublishCancelForValidCase() {
+    // Valid case for field follow-up: HH type, E region, standard treatment
+    EventDTO validCancel =
+        buildEvent(FieldActionInstruction.CANCEL, "E92000001", EventType.CASE_UPDATE);
+
+    underTest.receiveMessage(constructMessage(validCancel));
+
+    verify(fieldworkActionPublisher, times(1)).sendMessage(any(), any(), any());
   }
 
   @Test
