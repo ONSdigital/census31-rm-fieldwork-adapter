@@ -136,7 +136,8 @@ class ActionFieldReceiverTest {
   }
 
   @Test
-  void shouldSuppressCancelForNisraRegionOnly() {
+  void shouldSuppressCancelForExcludedRegions() {
+    // CN-220: CANCEL messages for N (NISRA) and S (Scotland) regions should be suppressed
     EventDTO northernIrelandCancel =
         buildEvent(FieldActionInstruction.CANCEL, "N92000002", EventType.CASE_UPDATE);
     EventDTO scotlandCancel =
@@ -148,12 +149,13 @@ class ActionFieldReceiverTest {
     underTest.receiveMessage(constructMessage(scotlandCancel));
     underTest.receiveMessage(constructMessage(englandCancel));
 
+    // Only England CANCEL should be published
     ArgumentCaptor<Object> payloadCaptor = ArgumentCaptor.forClass(Object.class);
-    verify(fieldworkActionPublisher, times(2))
+    verify(fieldworkActionPublisher, times(1))
         .sendMessage(eq(TEST_TOPIC), payloadCaptor.capture(), anyMap());
 
     assertThat(payloadCaptor.getAllValues())
-        .hasSize(2)
+        .hasSize(1)
         .allSatisfy(
             payload ->
                 assertThat(((FwmtCancelActionInstructionDTO) payload).getActionInstruction())
