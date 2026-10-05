@@ -38,6 +38,7 @@ import uk.gov.ons.census.fieldworkadapter.model.dto.PayloadDTO;
 import uk.gov.ons.census.fieldworkadapter.model.dto.RefusalTypeDTO;
 import uk.gov.ons.census.fieldworkadapter.service.FieldFollowUpFilter;
 import uk.gov.ons.census.fieldworkadapter.utils.ActionInstructionMapper;
+import uk.gov.ons.census.fieldworkadapter.utils.Constants;
 import uk.gov.ons.census.fieldworkadapter.utils.JsonHelper;
 
 @ExtendWith(SpringExtension.class)
@@ -89,7 +90,7 @@ class ActionFieldReceiverIT {
     assertThat(payloadCaptor.getValue()).isInstanceOf(FwmtActionInstructionDTO.class);
     FwmtActionInstructionDTO published = (FwmtActionInstructionDTO) payloadCaptor.getValue();
     assertThat(published.getActionInstruction()).isEqualTo(FieldActionInstruction.CREATE);
-    assertThat(published.getSurveyName()).isEqualTo("Census");
+    assertThat(published.getSurveyName()).isEqualTo(Constants.SURVEY_NAME);
     assertThat(published.getCaseId()).isEqualTo(event.getPayload().getCaseUpdate().getCaseId());
     assertThat(attributesCaptor.getValue())
         .containsEntry("eventId", event.getHeader().getMessageId().toString())
@@ -110,7 +111,7 @@ class ActionFieldReceiverIT {
     FwmtCancelActionInstructionDTO published =
         (FwmtCancelActionInstructionDTO) payloadCaptor.getValue();
     assertThat(published.getActionInstruction()).isEqualTo(FieldActionInstruction.CANCEL);
-    assertThat(published.getSurveyName()).isEqualTo("Census");
+    assertThat(published.getSurveyName()).isEqualTo(Constants.SURVEY_NAME);
     assertThat(published.getCaseId()).isEqualTo(event.getPayload().getCaseUpdate().getCaseId());
     verify(fieldworkActionPublisher, times(1)).sendMessage(eq(TEST_TOPIC), any(), any());
   }
@@ -128,7 +129,7 @@ class ActionFieldReceiverIT {
     assertThat(payloadCaptor.getValue()).isInstanceOf(FwmtActionInstructionDTO.class);
     FwmtActionInstructionDTO published = (FwmtActionInstructionDTO) payloadCaptor.getValue();
     assertThat(published.getActionInstruction()).isEqualTo(FieldActionInstruction.UPDATE);
-    assertThat(published.getSurveyName()).isEqualTo("Census");
+    assertThat(published.getSurveyName()).isEqualTo("CENSUS");
     assertThat(published.getCaseId()).isEqualTo(event.getPayload().getCaseUpdate().getCaseId());
     verify(fieldworkActionPublisher, times(1)).sendMessage(eq(TEST_TOPIC), any(), any());
   }
