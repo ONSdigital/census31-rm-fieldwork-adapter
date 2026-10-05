@@ -13,7 +13,7 @@ public class CaseUpdateDTO {
   private boolean invalid;
   private boolean surveyLaunched;
   private boolean receiptReceived;
-  private RefusalTypeDTO refusalReceived;
+  private boolean refusalReceived;
   private OffsetDateTime createdAt;
   private OffsetDateTime lastUpdatedAt;
 

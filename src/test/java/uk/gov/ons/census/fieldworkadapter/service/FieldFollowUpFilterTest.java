@@ -5,7 +5,6 @@ import static org.assertj.core.api.Assertions.assertThat;
 import org.junit.jupiter.api.Test;
 import uk.gov.ons.census.fieldworkadapter.model.dto.Address;
 import uk.gov.ons.census.fieldworkadapter.model.dto.CaseUpdateDTO;
-import uk.gov.ons.census.fieldworkadapter.model.dto.RefusalTypeDTO;
 import uk.gov.ons.census.fieldworkadapter.service.FieldFollowUpFilter.Exclusion;
 
 class FieldFollowUpFilterTest {
@@ -28,7 +27,7 @@ class FieldFollowUpFilterTest {
   @Test
   void shouldExcludeRefusedCase() {
     CaseUpdateDTO caseUpdate = eligibleCase();
-    caseUpdate.setRefusalReceived(RefusalTypeDTO.HARD_REFUSAL);
+    caseUpdate.setRefusalReceived(true);
 
     assertThat(underTest.exclusionFor(caseUpdate)).contains(Exclusion.REFUSED);
   }
@@ -72,7 +71,7 @@ class FieldFollowUpFilterTest {
   void shouldReturnFirstMatchingExclusion() {
     CaseUpdateDTO caseUpdate = eligibleCase();
     caseUpdate.setInvalid(true);
-    caseUpdate.setRefusalReceived(RefusalTypeDTO.EXTRAORDINARY_REFUSAL);
+    caseUpdate.setRefusalReceived(true);
     caseUpdate.setReceiptReceived(true);
     caseUpdate.setCaseType("HI");
     caseUpdate.setTreatmentCode("HH_ONE");

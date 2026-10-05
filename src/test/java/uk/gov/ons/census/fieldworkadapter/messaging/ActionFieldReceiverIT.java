@@ -35,7 +35,6 @@ import uk.gov.ons.census.fieldworkadapter.model.dto.FieldActionInstruction;
 import uk.gov.ons.census.fieldworkadapter.model.dto.FwmtActionInstructionDTO;
 import uk.gov.ons.census.fieldworkadapter.model.dto.FwmtCancelActionInstructionDTO;
 import uk.gov.ons.census.fieldworkadapter.model.dto.PayloadDTO;
-import uk.gov.ons.census.fieldworkadapter.model.dto.RefusalTypeDTO;
 import uk.gov.ons.census.fieldworkadapter.service.FieldFollowUpFilter;
 import uk.gov.ons.census.fieldworkadapter.utils.ActionInstructionMapper;
 import uk.gov.ons.census.fieldworkadapter.utils.Constants;
@@ -270,6 +269,7 @@ class ActionFieldReceiverIT {
             FieldActionInstruction.CANCEL,
             "E92000001",
             EventType.CASE_UPDATE,
+            caseUpdate -> caseUpdate.setRefusalReceived(true));
             caseUpdate -> caseUpdate.setRefusalReceived(RefusalTypeDTO.HARD_REFUSAL));
 
     underTest.receiveMessage(constructMessage(invalidCancel));
