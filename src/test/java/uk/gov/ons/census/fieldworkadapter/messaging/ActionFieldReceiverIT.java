@@ -270,7 +270,6 @@ class ActionFieldReceiverIT {
             "E92000001",
             EventType.CASE_UPDATE,
             caseUpdate -> caseUpdate.setRefusalReceived(true));
-            caseUpdate -> caseUpdate.setRefusalReceived(RefusalTypeDTO.HARD_REFUSAL));
 
     underTest.receiveMessage(constructMessage(invalidCancel));
     underTest.receiveMessage(constructMessage(refusalCancel));

@@ -70,7 +70,7 @@ public class FieldFollowUpFilter {
     if (caseUpdate.isInvalid()) {
       return Optional.of(Exclusion.INVALID);
     }
-    if (caseUpdate.getRefusalReceived()) {
+    if (caseUpdate.isRefusalReceived()) {
       return Optional.of(Exclusion.REFUSED);
     }
     // Receipt exclusion applies only to HH cases (not CE/SPG)
