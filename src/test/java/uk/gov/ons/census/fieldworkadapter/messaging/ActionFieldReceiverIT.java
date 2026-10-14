@@ -88,9 +88,14 @@ class ActionFieldReceiverIT {
 
     assertThat(payloadCaptor.getValue()).isInstanceOf(FwmtActionInstructionDTO.class);
     FwmtActionInstructionDTO published = (FwmtActionInstructionDTO) payloadCaptor.getValue();
+    String json = JsonHelper.convertObjectToJson(published);
     assertThat(published.getActionInstruction()).isEqualTo(FieldActionInstruction.CREATE);
     assertThat(published.getSurveyName()).isEqualTo(Constants.SURVEY_NAME);
     assertThat(published.getCaseId()).isEqualTo(event.getPayload().getCaseUpdate().getCaseId());
+    assertThat(published.getAddressType()).isEqualTo("HH");
+    assertThat(published.getFieldCoordinatorId()).isEqualTo("FC001");
+    assertThat(published.getFieldOfficerId()).isNull();
+    assertThat(json).contains("\"fieldCoordinatorId\":\"FC001\"").doesNotContain("fieldOfficerId");
     assertThat(attributesCaptor.getValue())
         .containsEntry("eventId", event.getHeader().getMessageId().toString())
         .containsKeys("correlationId", "caseId", "eventType", "schemaVersion", "occurredAt");
@@ -127,9 +132,14 @@ class ActionFieldReceiverIT {
 
     assertThat(payloadCaptor.getValue()).isInstanceOf(FwmtActionInstructionDTO.class);
     FwmtActionInstructionDTO published = (FwmtActionInstructionDTO) payloadCaptor.getValue();
+    String json = JsonHelper.convertObjectToJson(published);
     assertThat(published.getActionInstruction()).isEqualTo(FieldActionInstruction.UPDATE);
     assertThat(published.getSurveyName()).isEqualTo("CENSUS");
     assertThat(published.getCaseId()).isEqualTo(event.getPayload().getCaseUpdate().getCaseId());
+    assertThat(published.getAddressType()).isEqualTo("HH");
+    assertThat(published.getFieldCoordinatorId()).isEqualTo("FC001");
+    assertThat(published.getFieldOfficerId()).isNull();
+    assertThat(json).contains("\"fieldCoordinatorId\":\"FC001\"").doesNotContain("fieldOfficerId");
     verify(fieldworkActionPublisher, times(1)).sendMessage(eq(TEST_TOPIC), any(), any());
   }
 
