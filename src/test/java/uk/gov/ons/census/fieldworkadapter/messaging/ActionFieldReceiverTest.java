@@ -38,7 +38,7 @@ import uk.gov.ons.census.fieldworkadapter.utils.Constants;
 @ExtendWith(MockitoExtension.class)
 class ActionFieldReceiverTest {
 
-  private static final String TEST_TOPIC = "event_fieldwork_action-instruction";
+  private static final String TEST_TOPIC = "event_action-instruction";
   private static final OffsetDateTime EVENT_TIME = OffsetDateTime.parse("2026-08-25T10:15:30Z");
 
   @Mock private FieldworkActionPublisher fieldworkActionPublisher;
