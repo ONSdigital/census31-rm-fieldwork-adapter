@@ -58,7 +58,7 @@ public class ActionInstructionMapper {
   private void mapHouseholdFields(CaseUpdateDTO caseUpdate, FwmtActionInstructionDTO mapped) {
     mapped.setCaseRef(caseUpdate.getCaseRef());
     mapped.setOa(caseUpdate.getOa());
-    mapped.setFieldOfficerId(caseUpdate.getFieldOfficerId());
+    mapped.setFieldCoordinatorId(caseUpdate.getFieldCoordinatorId());
     mapped.setUndeliveredAsAddress(caseUpdate.getUndeliveredAsAddress());
     mapped.setBlankFormReturned(caseUpdate.getBlankFormReturned());
     mapSharedAddressFields(caseUpdate, mapped);

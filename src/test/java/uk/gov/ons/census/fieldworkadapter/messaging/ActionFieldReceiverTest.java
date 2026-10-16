@@ -78,7 +78,8 @@ class ActionFieldReceiverTest {
     assertThat(published.getCaseId()).isEqualTo(event.getPayload().getCaseUpdate().getCaseId());
     assertThat(published.getAddressType()).isEqualTo("HH");
     assertThat(published.getCaseRef()).isEqualTo("1000000001");
-    assertThat(published.getFieldOfficerId()).isEqualTo("FO12345");
+    assertThat(published.getFieldOfficerId()).isNull();
+    assertThat(published.getFieldCoordinatorId()).isEqualTo("FC001");
     assertThat(published.getPostcode()).isEqualTo("AB1 2CD");
     assertCommonAttributes(publishedMessage.attributes(), event);
   }
@@ -98,7 +99,8 @@ class ActionFieldReceiverTest {
     assertThat(published.getCaseId()).isEqualTo(event.getPayload().getCaseUpdate().getCaseId());
     assertThat(published.getAddressType()).isEqualTo("HH");
     assertThat(published.getCaseRef()).isEqualTo("1000000001");
-    assertThat(published.getFieldOfficerId()).isEqualTo("FO12345");
+    assertThat(published.getFieldOfficerId()).isNull();
+    assertThat(published.getFieldCoordinatorId()).isEqualTo("FC001");
     assertThat(published.getPostcode()).isEqualTo("AB1 2CD");
     assertCommonAttributes(publishedMessage.attributes(), event);
   }

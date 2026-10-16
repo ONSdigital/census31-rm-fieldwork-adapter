@@ -27,8 +27,8 @@ class ActionInstructionMapperTest {
     assertThat(mapped.getCaseRef()).isEqualTo(caseUpdate.getCaseRef());
     assertThat(mapped.getAddressType()).isEqualTo("HH");
     assertThat(mapped.getAddressLevel()).isNull();
-    assertThat(mapped.getFieldOfficerId()).isEqualTo(caseUpdate.getFieldOfficerId());
-    assertThat(mapped.getFieldCoordinatorId()).isNull();
+    assertThat(mapped.getFieldOfficerId()).isNull();
+    assertThat(mapped.getFieldCoordinatorId()).isEqualTo(caseUpdate.getFieldCoordinatorId());
     assertThat(mapped.getBlankFormReturned()).isTrue();
     assertThat(mapped.getUndeliveredAsAddress()).isFalse();
     assertThat(mapped.getLatitude()).isEqualTo(51.5);
@@ -37,9 +37,16 @@ class ActionInstructionMapperTest {
     assertThat(mapped.getCeActualResponses()).isNull();
     assertThat(mapped.getSecureEstablishment()).isNull();
     assertThat(json)
-        .contains("\"blankFormReturned\":true", "\"undeliveredAsAddress\":false")
+        .contains(
+            "\"fieldCoordinatorId\":\"FC001\"",
+            "\"blankFormReturned\":true",
+            "\"undeliveredAsAddress\":false")
         .doesNotContain(
-            "addressLevel", "ceExpectedCapacity", "ceActualResponses", "secureEstablishment");
+            "addressLevel",
+            "fieldOfficerId",
+            "ceExpectedCapacity",
+            "ceActualResponses",
+            "secureEstablishment");
   }
 
   @Test
