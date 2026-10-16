@@ -50,12 +50,12 @@ import uk.gov.ons.census.fieldworkadapter.utils.JsonHelper;
     })
 @TestPropertySource(
     properties = {
-      "queueconfig.fieldwork-action-instruction-topic=event_fieldwork_action-instruction",
+      "queueconfig.fieldwork-action-instruction-topic=event_action-instruction",
       "queueconfig.publishtimeout=5"
     })
 class ActionFieldReceiverIT {
 
-  public static final String TEST_TOPIC = "event_fieldwork_action-instruction";
+  public static final String TEST_TOPIC = "event_action-instruction";
 
   @Configuration
   static class TestConfig {

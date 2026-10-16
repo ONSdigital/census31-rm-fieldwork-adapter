@@ -27,7 +27,7 @@ spring:
 
 queueconfig:
   case-update-subscription: event_case-update_rm-fieldwork-adapter
-  fieldwork-action-instruction-topic: event_fieldwork_action-instruction
+  fieldwork-action-instruction-topic: event_action-instruction
   publishtimeout: 10  # In seconds
 
 healthcheck:
